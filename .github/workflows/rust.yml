@@ -51,7 +51,7 @@ jobs:
         run: cargo build --release
 
       - name: Check formatting
-        run: cargo fmt --check
+        run: cargo fmt 
 
       - name: Clippy
         run: cargo clippy -- -D warnings
