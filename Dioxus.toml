@@ -1,0 +1,11 @@
+[application]
+name = "git-tree"
+default_platform = "desktop"
+out_dir = "dist"
+asset_dir = "public"
+
+[web.app]
+title = "git-tree"
+
+[desktop.app]
+filename = "git-tree"
