@@ -15,6 +15,7 @@ jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -23,23 +24,43 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev pkg-config
-      
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libglib2.0-dev \
+            libgdk-pixbuf-2.0-dev \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            libxdo-dev \
+            libgit2-dev \
+            pkg-config
 
+      # Cache AFTER installing deps, BEFORE compiling anything
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Check formatting FIRST — fastest failure, no compile needed
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      # Clippy SECOND — catches logic errors before full build
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+
+      # Full release build LAST
       - name: Build
         run: cargo build --release
 
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Clippy
-        run: cargo clippy -- -D warnings
+      # Upload binary only on version tags (v*)
+      - name: Upload binary
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-tree-linux-${{ github.ref_name }}
+          path: target/release/git-tree
+          retention-days: 30
