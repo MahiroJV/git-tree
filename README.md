@@ -1,3 +1,4 @@
+# THAT PROJECT NOT-FULLY PREPARED
 # git-tree 🌿
 
 > Terminal-style git branch visualizer — built with Rust + Dioxus
