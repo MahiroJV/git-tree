@@ -11,8 +11,8 @@ pub struct HomeScreenProps {
 
 #[component]
 pub fn HomeScreen(props: HomeScreenProps) -> Element {
-    let mut local_path = use_signal(|| String::new());
-    let mut remote_url = use_signal(|| String::new());
+    let mut local_path = use_signal(String::new);
+    let mut remote_url = use_signal(String::new);
     let mut error = use_signal(|| Option::<String>::None);
     let mut tab = use_signal(|| "local");
 
@@ -22,11 +22,13 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
 
             pre {
                 class: "ascii-header",
-"  ██████ ██ ████████     ████████ ██████  ███████ ███████
+"
+  ██████ ██ ████████     ████████ ██████  ███████ ███████
  ██       ██    ██           ██    ██   ██ ██      ██
  ██   ███ ██    ██    ████   ██    ██████  █████   █████
  ██    ██ ██    ██           ██    ██   ██ ██      ██
-  ██████  ██    ██           ██    ██   ██ ███████ ███████"
+  ██████  ██    ██           ██    ██   ██ ███████ ███████
+  "
             }
 
             p { class: "home-tagline", "VISUALIZE YOUR GIT HISTORY — TERMINAL STYLE" }
