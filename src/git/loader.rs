@@ -19,7 +19,7 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
     let folder_name = url
         .trim_end_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("repo")
         .trim_end_matches(".git");
 
@@ -39,7 +39,7 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
 }
 
 /// Fetch + pull latest changes for an already-loaded repo
-#[warn(dead_code)]
+#[allow(dead_code)]
 pub fn refresh_local(path: &Path) -> Result<RepoTree> {
     let repo = Repository::open(path)?;
 

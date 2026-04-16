@@ -104,7 +104,7 @@ pub fn TreeCanvas(
                             x,
                             y,
                             selected: selected_hash.as_deref() == Some(&commit.hash),
-                            on_click: on_select.clone(),
+                            on_click: on_select,
                         }
                     }
                 }

@@ -129,7 +129,7 @@ pub const THEMES: &[Theme] = &[
         danger: "#FF2244",
     },
 ];
-#[warn(dead_code)]
+#[allow(dead_code)]
 pub fn default_theme() -> &'static Theme {
     &THEMES[0] // Terminal (purple)
 }
