@@ -1,131 +1,106 @@
-// components/tree_canvas.rs — Main SVG tree visualization
+// components/tree_canvas.rs — SVG tree visualization
 use dioxus::prelude::*;
-use crate::git::{parser::RepoTree, parser::CommitNode};
+use crate::git::parser::RepoTree;
+use crate::git::parser::CommitNode;
 
-#[derive(Props, Clone, PartialEq)]
-pub struct TreeCanvasProps {
-    pub tree: Option<RepoTree>,
-    pub selected_hash: Option<String>,
-    pub on_select: EventHandler<CommitNode>,
-}
-
-// Layout constants
 const NODE_RADIUS: f64 = 10.0;
-const H_SPACING: f64 = 120.0;   // horizontal space between commits
-const V_MAIN: f64 = 200.0;      // Y position of main branch
-const V_BRANCH_UP: f64 = 90.0;  // Y for branches going up
-const V_BRANCH_DOWN: f64 = 310.0; // Y for branches going down
+const H_SPACING: f64 = 120.0;
+const CANVAS_HEIGHT: f64 = 500.0;
+const V_MAIN: f64 = 250.0;        // dead center vertically
+const V_BRANCH_UP: f64 = 130.0;
+const V_BRANCH_DOWN: f64 = 370.0;
 
 #[component]
-pub fn TreeCanvas(props: TreeCanvasProps) -> Element {
-    let tree = match &props.tree {
-        Some(t) => t,
-        None => return rsx! { div { class: "canvas-empty", "No repository loaded." } },
+pub fn TreeCanvas(
+    tree: Option<RepoTree>,
+    selected_hash: Option<String>,
+    on_select: EventHandler<CommitNode>,
+) -> Element {
+    let Some(tree) = tree else {
+        return rsx! {
+            div { class: "canvas-empty", "> NO REPOSITORY LOADED" }
+        };
     };
 
-    // Calculate canvas width based on commit count
     let commit_count = tree.commits.len().max(1);
     let canvas_width = (commit_count as f64 * H_SPACING) + 200.0;
-    let canvas_height = 400.0;
 
-    // Build a list of (commit, x, y) for rendering
-    let positioned: Vec<(&CommitNode, f64, f64)> = tree
+    let positioned: Vec<(CommitNode, f64, f64)> = tree
         .commits
         .iter()
         .enumerate()
         .map(|(i, commit)| {
             let x = 100.0 + (i as f64 * H_SPACING);
-            // Main branch commits stay at V_MAIN
-            // Merge commits alternate up/down (simplified v0.1)
             let y = if commit.is_merge {
                 if i % 2 == 0 { V_BRANCH_UP } else { V_BRANCH_DOWN }
             } else {
                 V_MAIN
             };
-            (commit, x, y)
+            (commit.clone(), x, y)
         })
         .collect();
 
     rsx! {
         div {
             class: "canvas-wrapper",
-
-            // Horizontal scrollable SVG canvas
             div {
                 class: "canvas-scroll",
-                style: "overflow-x: auto; overflow-y: hidden;",
 
                 svg {
                     width: "{canvas_width}",
-                    height: "{canvas_height}",
+                    height: "{CANVAS_HEIGHT}",
                     xmlns: "http://www.w3.org/2000/svg",
 
-                    // ── Grid lines (subtle terminal feel) ──
+                    // Subtle dot grid background
                     defs {
                         pattern {
-                            id: "grid",
-                            width: "40",
-                            height: "40",
+                            id: "dotgrid",
+                            width: "40", height: "40",
                             pattern_units: "userSpaceOnUse",
-                            line {
-                                x1: "0", y1: "0", x2: "0", y2: "40",
-                                stroke: "#111111", stroke_width: "0.5"
-                            }
-                            line {
-                                x1: "0", y1: "0", x2: "40", y2: "0",
-                                stroke: "#111111", stroke_width: "0.5"
-                            }
+                            circle { cx: "1", cy: "1", r: "0.8", fill: "#1a1a1a" }
                         }
                     }
-                    rect {
-                        width: "100%", height: "100%",
-                        fill: "url(#grid)"
-                    }
+                    rect { width: "100%", height: "100%", fill: "url(#dotgrid)" }
 
-                    // ── Main branch line (horizontal) ──
+                    // Main branch line — full width, dead center
                     line {
-                        x1: "60",
+                        x1: "40",
                         y1: "{V_MAIN}",
-                        x2: "{canvas_width - 60.0}",
+                        x2: "{canvas_width - 40.0}",
                         y2: "{V_MAIN}",
                         stroke: "var(--accent)",
                         stroke_width: "2",
-                        stroke_dasharray: "none",
+                        opacity: "0.6"
                     }
 
-                    // ── Branch Bézier curves ──
+                    // Branch bezier curves for merge commits
                     for (commit, x, y) in &positioned {
                         if commit.is_merge {
-                            // Draw bezier from main to branch point and back
+                            // curve from main → branch node
                             path {
-                                d: bezier_path(
-                                    *x - H_SPACING, V_MAIN,
-                                    *x, *y
-                                ),
+                                d: bezier(*x - H_SPACING, V_MAIN, *x, *y),
                                 stroke: "{commit.color}",
-                                stroke_width: "2",
-                                fill: "none",
+                                stroke_width: "1.5",
+                                fill: "none"
                             }
+                            // curve from branch node → back to main
                             path {
-                                d: bezier_path(
-                                    *x, *y,
-                                    *x + H_SPACING, V_MAIN
-                                ),
+                                d: bezier(*x, *y, *x + H_SPACING, V_MAIN),
                                 stroke: "{commit.color}",
-                                stroke_width: "2",
-                                fill: "none",
+                                stroke_width: "1.5",
+                                fill: "none"
                             }
                         }
                     }
 
-                    // ── Commit nodes ──
-                    for (commit, x, y) in &positioned {
-                        CommitNodeSvg {
-                            commit: (*commit).clone(),
-                            x: *x,
-                            y: *y,
-                            selected: props.selected_hash.as_deref() == Some(&commit.hash),
-                            on_click: props.on_select.clone(),
+                    // Commit nodes on top
+                    for (commit, x, y) in positioned {
+                        CommitDot {
+                            commit: commit.clone(),
+                            x,
+                            y,
+                            selected: selected_hash.as_deref() == Some(&commit.hash),
+                            on_click: on_select.clone(),
                         }
                     }
                 }
@@ -134,70 +109,63 @@ pub fn TreeCanvas(props: TreeCanvasProps) -> Element {
     }
 }
 
-// ── SVG Commit Node Component ─────────────────────────────────────────────────
-
-#[derive(Props, Clone, PartialEq)]
-struct CommitNodeSvgProps {
+#[component]
+fn CommitDot(
     commit: CommitNode,
     x: f64,
     y: f64,
     selected: bool,
     on_click: EventHandler<CommitNode>,
-}
-
-#[component]
-fn CommitNodeSvg(props: CommitNodeSvgProps) -> Element {
-    let commit = props.commit.clone();
-    let stroke_width = if props.selected { 3.0 } else { 2.0 };
-    let fill = if props.selected { props.commit.color.clone() } else { "var(--bg)".to_string() };
+) -> Element {
+    let color = commit.color.clone();
+    let fill = if selected { color.clone() } else { "#000000".to_string() };
+    let stroke_w = if selected { "3" } else { "2" };
+    let c = commit.clone();
 
     rsx! {
         g {
-            class: "commit-node",
             style: "cursor: pointer;",
-            onclick: move |_| props.on_click.call(commit.clone()),
+            onclick: move |_| on_click.call(c.clone()),
 
-            // Outer ring (selected state)
-            if props.selected {
+            // Glow ring when selected
+            if selected {
                 circle {
-                    cx: "{props.x}",
-                    cy: "{props.y}",
-                    r: "{NODE_RADIUS + 5.0}",
+                    cx: "{x}", cy: "{y}",
+                    r: "{NODE_RADIUS + 6.0}",
                     fill: "none",
-                    stroke: "{props.commit.color}",
+                    stroke: "{color}",
                     stroke_width: "1",
-                    opacity: "0.3",
+                    opacity: "0.25"
                 }
             }
 
             // Main circle
             circle {
-                cx: "{props.x}",
-                cy: "{props.y}",
+                cx: "{x}", cy: "{y}",
                 r: "{NODE_RADIUS}",
                 fill: "{fill}",
-                stroke: "{props.commit.color}",
-                stroke_width: "{stroke_width}",
+                stroke: "{color}",
+                stroke_width: "{stroke_w}"
             }
 
-            // HEAD indicator
-            if props.commit.is_head {
+            // HEAD label above node
+            if commit.is_head {
                 text {
-                    x: "{props.x}",
-                    y: "{props.y - NODE_RADIUS - 16.0}",
+                    x: "{x}", y: "{y - NODE_RADIUS - 14.0}",
                     text_anchor: "middle",
                     font_size: "10",
                     font_family: "Space Mono, monospace",
                     fill: "var(--accent)",
+                    font_weight: "bold",
+                    letter_spacing: "0.1em",
                     "HEAD"
                 }
             }
 
             // Tag badges
-            for (i, tag) in props.commit.tags.iter().enumerate() {
+            for (i, tag) in commit.tags.iter().enumerate() {
                 text {
-                    x: "{props.x}",
-                    y: "{props.y - NODE_RADIUS - 28.0 - (i as f64 * 14.0)}",
+                    x: "{x}", y: "{y - NODE_RADIUS - 28.0 - (i as f64 * 15.0)}",
                     text_anchor: "middle",
                     font_size: "9",
                     font_family: "Space Mono, monospace",
@@ -206,26 +174,25 @@ fn CommitNodeSvg(props: CommitNodeSvgProps) -> Element {
                 }
             }
 
-            // Short hash below the node
+            // Short hash below node
             text {
-                x: "{props.x}",
-                y: "{props.y + NODE_RADIUS + 16.0}",
+                x: "{x}", y: "{y + NODE_RADIUS + 18.0}",
                 text_anchor: "middle",
                 font_size: "10",
                 font_family: "Space Mono, monospace",
                 fill: "var(--text-muted)",
-                "{props.commit.short_hash}"
+                letter_spacing: "0.05em",
+                "{commit.short_hash}"
             }
 
-            // Merge indicator
-            if props.commit.is_merge {
+            // Merge indicator dot inside circle
+            if commit.is_merge {
                 text {
-                    x: "{props.x}",
-                    y: "{props.y + 4.0}",
+                    x: "{x}", y: "{y + 4.0}",
                     text_anchor: "middle",
-                    font_size: "9",
+                    font_size: "8",
                     font_family: "Space Mono, monospace",
-                    fill: "var(--bg)",
+                    fill: "{color}",
                     "M"
                 }
             }
@@ -233,15 +200,7 @@ fn CommitNodeSvg(props: CommitNodeSvgProps) -> Element {
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Build an SVG cubic bezier path string between two points
-fn bezier_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
-    let cx1 = x1 + (x2 - x1) * 0.5;
-    let cy1 = y1;
-    let cx2 = x1 + (x2 - x1) * 0.5;
-    let cy2 = y2;
-    format!(
-        "M {x1} {y1} C {cx1} {cy1}, {cx2} {cy2}, {x2} {y2}"
-    )
+fn bezier(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
+    let cx = x1 + (x2 - x1) * 0.5;
+    format!("M {x1} {y1} C {cx} {y1}, {cx} {y2}, {x2} {y2}")
 }

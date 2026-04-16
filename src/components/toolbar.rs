@@ -1,45 +1,43 @@
-// components/toolbar.rs — Top navigation bar
+// components/toolbar.rs
 use dioxus::prelude::*;
 
-#[derive(Props, Clone, PartialEq)]
-pub struct ToolbarProps {
-    pub repo_name: String,
-    pub on_home: EventHandler<()>,
-    pub on_settings: EventHandler<()>,
-    pub on_refresh: EventHandler<()>,
-}
-
 #[component]
-pub fn Toolbar(props: ToolbarProps) -> Element {
+pub fn Toolbar(
+    repo_name: String,
+    on_home: EventHandler<()>,
+    on_settings: EventHandler<()>,
+    on_refresh: EventHandler<()>,
+) -> Element {
     rsx! {
         nav {
             class: "toolbar",
 
-            // Left — app name + repo
-            div {
-                class: "toolbar",
+            // Left — brand only
+            div { class: "toolbar-left",
                 span {
                     class: "toolbar-brand",
-                    onclick: move |_| props.on_home.call(()),
+                    onclick: move |_| on_home.call(()),
                     "GIT-TREE"
-                }
-                if !props.repo_name.is_empty() {
-                    span { class: "toolbar-separator", "/" }
-                    span { class: "toolbar-repo", "{props.repo_name}"}
                 }
             }
 
-            // Right — actions
-            div {
-                class: "toolbar-right",
+            // Center — repo name
+            div { class: "toolbar-center",
+                if !repo_name.is_empty() {
+                    span { class: "toolbar-repo", "/ {repo_name}" }
+                }
+            }
+
+            // Right — buttons always visible
+            div { class: "toolbar-right",
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| props.on_refresh.call(()),
+                    onclick: move |_| on_refresh.call(()),
                     "[ REFRESH ]"
                 }
                 button {
-                    class: "toolbar-btn",
-                    onclick: move |_| props.on_settings.call(()),
+                    class: "toolbar-btn toolbar-btn-accent",
+                    onclick: move |_| on_settings.call(()),
                     "[ SETTINGS ]"
                 }
             }
