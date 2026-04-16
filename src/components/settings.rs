@@ -1,6 +1,6 @@
 // components/settings.rs — Theme selector
-use dioxus::prelude::*;
 use crate::theme::THEMES;
+use dioxus::prelude::*;
 
 #[component]
 pub fn Settings(

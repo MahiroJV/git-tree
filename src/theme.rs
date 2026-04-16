@@ -11,10 +11,10 @@ pub struct Theme {
     pub bg_secondary: &'static str, // panels, cards
     pub text: &'static str,
     pub text_muted: &'static str,
-    pub accent: &'static str,       // primary accent (purple in default)
+    pub accent: &'static str, // primary accent (purple in default)
     pub border: &'static str,
-    pub success: &'static str,      // added lines
-    pub danger: &'static str,       // removed lines
+    pub success: &'static str, // added lines
+    pub danger: &'static str,  // removed lines
 }
 
 // ─── All Themes ──────────────────────────────────────────────────────────────

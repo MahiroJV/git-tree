@@ -1,12 +1,12 @@
 // components/tree_canvas.rs — SVG tree visualization
-use dioxus::prelude::*;
-use crate::git::parser::RepoTree;
 use crate::git::parser::CommitNode;
+use crate::git::parser::RepoTree;
+use dioxus::prelude::*;
 
 const NODE_RADIUS: f64 = 10.0;
 const H_SPACING: f64 = 120.0;
 const CANVAS_HEIGHT: f64 = 500.0;
-const V_MAIN: f64 = 250.0;        // dead center vertically
+const V_MAIN: f64 = 250.0; // dead center vertically
 const V_BRANCH_UP: f64 = 130.0;
 const V_BRANCH_DOWN: f64 = 370.0;
 
@@ -32,7 +32,11 @@ pub fn TreeCanvas(
         .map(|(i, commit)| {
             let x = 100.0 + (i as f64 * H_SPACING);
             let y = if commit.is_merge {
-                if i % 2 == 0 { V_BRANCH_UP } else { V_BRANCH_DOWN }
+                if i % 2 == 0 {
+                    V_BRANCH_UP
+                } else {
+                    V_BRANCH_DOWN
+                }
             } else {
                 V_MAIN
             };
@@ -118,7 +122,11 @@ fn CommitDot(
     on_click: EventHandler<CommitNode>,
 ) -> Element {
     let color = commit.color.clone();
-    let fill = if selected { color.clone() } else { "#000000".to_string() };
+    let fill = if selected {
+        color.clone()
+    } else {
+        "#000000".to_string()
+    };
     let stroke_w = if selected { "3" } else { "2" };
     let c = commit.clone();
 

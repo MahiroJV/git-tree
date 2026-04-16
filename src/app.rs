@@ -1,16 +1,12 @@
 // app.rs — Root component + global state
-use dioxus::prelude::*;
-use crate::git::parser::RepoTree;
-use crate::git::parser::CommitNode;
-use crate::theme::theme_by_name;
 use crate::components::{
-    home_screen::HomeScreen,
-    toolbar::Toolbar,
-    tree_canvas::TreeCanvas,
-    left_panel::LeftPanel,
-    right_panel::RightPanel,
-    settings::Settings,
+    home_screen::HomeScreen, left_panel::LeftPanel, right_panel::RightPanel, settings::Settings,
+    toolbar::Toolbar, tree_canvas::TreeCanvas,
 };
+use crate::git::parser::CommitNode;
+use crate::git::parser::RepoTree;
+use crate::theme::theme_by_name;
+use dioxus::prelude::*;
 
 const BASE_CSS: &str = include_str!("assets/style.css");
 

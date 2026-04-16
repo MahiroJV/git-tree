@@ -1,7 +1,7 @@
 // components/home_screen.rs — Landing screen
-use dioxus::prelude::*;
 use crate::git::loader;
 use crate::git::parser::RepoTree;
+use dioxus::prelude::*;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {

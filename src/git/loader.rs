@@ -7,8 +7,8 @@ use crate::git::parser::{parse_repo, RepoTree};
 
 /// Load from a local folder path
 pub fn load_local(path: &Path) -> Result<RepoTree> {
-    let repo = Repository::open(path)
-        .with_context(|| format!("Failed to open repo at {:?}", path))?;
+    let repo =
+        Repository::open(path).with_context(|| format!("Failed to open repo at {:?}", path))?;
     parse_repo(&repo)
 }
 
@@ -29,7 +29,7 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
         Repository::open(&clone_path)
             .with_context(|| format!("Failed to open cached clone at {:?}", clone_path))?
     } else {
-        let  fetch_opts = FetchOptions::new();
+        let fetch_opts = FetchOptions::new();
         RepoBuilder::new()
             .fetch_options(fetch_opts)
             .clone(url, &clone_path)
@@ -46,7 +46,11 @@ pub fn refresh_local(path: &Path) -> Result<RepoTree> {
     // Try to fetch from origin if available
     if let Ok(mut remote) = repo.find_remote("origin") {
         let mut fetch_opts = FetchOptions::new();
-        let _ = remote.fetch(&["refs/heads/*:refs/remotes/origin/*"], Some(&mut fetch_opts), None);
+        let _ = remote.fetch(
+            &["refs/heads/*:refs/remotes/origin/*"],
+            Some(&mut fetch_opts),
+            None,
+        );
     }
 
     parse_repo(&repo)

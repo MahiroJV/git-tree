@@ -1,8 +1,8 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use anyhow::Result;
-use git2::Repository;
 use crate::theme::contributor_color;
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use git2::Repository;
+use serde::{Deserialize, Serialize};
 
 // ─── Core Data Structures ────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ pub enum ChangeStatus {
 }
 
 /// Summary diff stats for a commit
-#[derive(Debug, Clone, Serialize,PartialEq, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, PartialEq, Deserialize, Default)]
 pub struct DiffStats {
     pub files_changed: usize,
     pub insertions: usize,
@@ -95,7 +95,8 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
     let head_id = repo.head().ok().and_then(|h| h.target());
 
     // Collect all tags for quick lookup
-    let mut tag_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut tag_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     repo.tag_foreach(|oid, name| {
         let tag_name = std::str::from_utf8(name)
             .unwrap_or("")
@@ -118,18 +119,14 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         let stats = if let Some(parent) = commit.parents().next() {
             let parent_tree = parent.tree()?;
             let commit_tree = commit.tree()?;
-            let diff = repo.diff_tree_to_tree(
-                Some(&parent_tree),
-                Some(&commit_tree),
-                None,
-            )?;
+            let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)?;
             let s = diff.stats()?;
             DiffStats {
                 files_changed: s.files_changed(),
                 insertions: s.insertions(),
                 deletions: s.deletions(),
             }
-        } else{
+        } else {
             DiffStats::default()
         };
 
@@ -140,13 +137,10 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
 
         let timestamp = DateTime::from_timestamp(commit.time().seconds(), 0).unwrap_or_default();
 
-        let parent_hashes: Vec<String> = commit
-            .parents()
-            .map(|p| p.id().to_string())
-            .collect();
+        let parent_hashes: Vec<String> = commit.parents().map(|p| p.id().to_string()).collect();
 
         let is_merge = parent_hashes.len() > 1;
-        let is_head = head_id.map(|h| h == oid ).unwrap_or(false);
+        let is_head = head_id.map(|h| h == oid).unwrap_or(false);
         let tags = tag_map.get(&hash).cloned().unwrap_or_default();
 
         commits.push(CommitNode {
@@ -223,7 +217,7 @@ fn build_branch_lines(commits: &[CommitNode]) -> Vec<BranchLine> {
         lines.push(BranchLine {
             name: "main".to_string(),
             commits: main_commits,
-            color: "#9B5DE5".to_string(), // accent color for main
+            color: "#9B5DE5".to_string(),   // accent color for main
             direction: BranchDirection::Up, // main is horizontal
             parent_hash: String::new(),
             merge_hash: None,
@@ -244,11 +238,7 @@ fn build_branch_lines(commits: &[CommitNode]) -> Vec<BranchLine> {
             commits: vec![commit.hash.clone()],
             color: commit.color.clone(),
             direction: dir,
-            parent_hash: commit
-                .parent_hashes
-                .first()
-                .cloned()
-                .unwrap_or_default(),
+            parent_hash: commit.parent_hashes.first().cloned().unwrap_or_default(),
             merge_hash: Some(commit.hash.clone()),
         });
     }

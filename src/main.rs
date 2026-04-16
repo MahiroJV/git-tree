@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
-use dioxus::prelude::*;
 use dioxus::desktop::{Config, WindowBuilder};
+use dioxus::prelude::*;
 
 mod app;
 mod components;
@@ -25,7 +25,5 @@ fn main() {
                 .to_string(),
         );
 
-    LaunchBuilder::desktop()
-        .with_cfg(config)
-        .launch(App);
+    LaunchBuilder::desktop().with_cfg(config).launch(App);
 }

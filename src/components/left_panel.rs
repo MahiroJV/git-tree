@@ -1,6 +1,6 @@
 // components/left_panel.rs — Commit details panel
-use dioxus::prelude::*;
 use crate::git::parser::CommitNode;
+use dioxus::prelude::*;
 
 #[component]
 pub fn LeftPanel(commit: Option<CommitNode>) -> Element {

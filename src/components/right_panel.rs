@@ -1,6 +1,6 @@
 // components/right_panel.rs — Diff stats panel
-use dioxus::prelude::*;
 use crate::git::parser::CommitNode;
+use dioxus::prelude::*;
 
 #[component]
 pub fn RightPanel(commit: Option<CommitNode>) -> Element {
