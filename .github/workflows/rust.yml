@@ -32,6 +32,8 @@ jobs:
           libgdk-pixbuf-2.0-dev \
           libcairo2-dev \
           libpango1.0-dev \
+          libwebkit2gtk-4.1-dev \
+          libsoup-3.0-dev \
           pkg-config
       
       - name: Cache cargo
