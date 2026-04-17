@@ -20,15 +20,9 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
         div {
             class: "home-screen",
 
-            pre {
+            h1 {
                 class: "ascii-header",
-"
-  ██████ ██ ████████     ████████ ██████  ███████ ███████
- ██       ██    ██           ██    ██   ██ ██      ██
- ██   ███ ██    ██    ████   ██    ██████  █████   █████
- ██    ██ ██    ██           ██    ██   ██ ██      ██
-  ██████  ██    ██           ██    ██   ██ ███████ ███████
-  "
+                "GIT-TREE"
             }
 
             p { class: "home-tagline", "VISUALIZE YOUR GIT HISTORY — TERMINAL STYLE" }

@@ -35,7 +35,7 @@ html, body, #main {
     color: var(--text);
     font-family: var(--font);
     font-size: 13px;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
 }
 
 /* ── Toolbar ── */
@@ -254,14 +254,19 @@ html, body, #main {
     background: var(--bg);
 }
 
+
 .ascii-header {
-    color: var(--accent);
-    font-size: 10px;
-    line-height: 1.5;
-    letter-spacing: 0.04em;
-    text-align: center;
-    text-shadow: 0 0 20px rgba(155, 93, 229, 0.5);
+    font-family: 'Oxanium', sans-serif;
+    font-size: 62px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: transparent;
+    -webkit-text-stroke: 1.5px #9B5DE5;
+    line-height: 1;
+    text-shadow: none;
 }
+
+
 
 .home-tagline {
     color: var(--text-muted);
