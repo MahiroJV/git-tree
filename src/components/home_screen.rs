@@ -2,6 +2,8 @@
 use crate::git::loader;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
+#[allow(unused_imports)]
+use rfd::FileDialog;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {
@@ -55,6 +57,17 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             value: "{local_path}",
                             oninput: move |e| local_path.set(e.value()),
                         }
+
+                        button {
+                            class: "btn-primary",
+                            onclick: move |_| {
+                                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                                    local_path.set(path.to_string_lossy().to_string());
+                                }
+                            },
+                            "📁"
+                        }
+
                         button {
                             class: "btn-primary",
                             onclick: move |_| {

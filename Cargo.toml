@@ -7,7 +7,7 @@ description = "A terminal-style git branch visualizer"
 
 [dependencies]
 dioxus = { version = "0.6", features = ["desktop"] }
-
+rfd = "0.12"
 # Git operations (local + remote clone)
 git2 = "0.19"
 
@@ -33,3 +33,13 @@ image = "0.25.10"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"
