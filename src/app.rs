@@ -8,7 +8,7 @@ use crate::git::parser::RepoTree;
 use crate::theme::theme_by_name;
 use dioxus::prelude::*;
 
-const BASE_CSS: &str = include_str!("assets/style.css");
+const BASE_CSS: &str = include_str!("../assets/style.css");
 
 #[derive(Clone, PartialEq)]
 pub enum Screen {
