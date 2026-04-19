@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
+use dioxus::desktop::tao::window::Icon;
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
-use dioxus::desktop::tao::window::Icon;
 use image::GenericImageView;
 
 mod app;
@@ -12,7 +12,6 @@ mod theme;
 use app::App;
 
 fn main() {
-
     let icon_bytes = include_bytes!("assets/icon.png");
     let img = image::load_from_memory(icon_bytes).unwrap().to_rgba8();
     let (w, h) = img.dimensions();
