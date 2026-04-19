@@ -27,6 +27,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Error handling
 anyhow = "1"
+image = "0.25.10"
 
 [profile.release]
 opt-level = 3

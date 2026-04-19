@@ -1,4 +1,4 @@
-// components/tree_canvas.rs — SVG tree visualization
+// components/tree_canvas.rs — SVG tree visualization with zoom + pan
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 const NODE_RADIUS: f64 = 10.0;
 const H_SPACING: f64 = 120.0;
 const CANVAS_HEIGHT: f64 = 500.0;
-const V_MAIN: f64 = 250.0; // dead center vertically
+const V_MAIN: f64 = 250.0;
 const V_BRANCH_UP: f64 = 130.0;
 const V_BRANCH_DOWN: f64 = 370.0;
 
@@ -16,6 +16,13 @@ pub fn TreeCanvas(
     selected_hash: Option<String>,
     on_select: EventHandler<CommitNode>,
 ) -> Element {
+    let mut scale = use_signal(|| 1.0_f64);
+    let mut offset_x = use_signal(|| 0.0_f64);
+    let mut offset_y = use_signal(|| 0.0_f64);
+    let mut is_dragging = use_signal(|| false);
+    let mut drag_start_x = use_signal(|| 0.0_f64);
+    let mut drag_start_y = use_signal(|| 0.0_f64);
+
     let Some(tree) = tree else {
         return rsx! {
             div { class: "canvas-empty", "> NO REPOSITORY LOADED" }
@@ -32,11 +39,7 @@ pub fn TreeCanvas(
         .map(|(i, commit)| {
             let x = 100.0 + (i as f64 * H_SPACING);
             let y = if commit.is_merge {
-                if i % 2 == 0 {
-                    V_BRANCH_UP
-                } else {
-                    V_BRANCH_DOWN
-                }
+                if i % 2 == 0 { V_BRANCH_UP } else { V_BRANCH_DOWN }
             } else {
                 V_MAIN
             };
@@ -47,15 +50,84 @@ pub fn TreeCanvas(
     rsx! {
         div {
             class: "canvas-wrapper",
+            style: "overflow: hidden; cursor: grab; position: relative;",
+
+            // zoom controls
             div {
-                class: "canvas-scroll",
+                style: "position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px;",
+                button {
+                    class: "toolbar-btn",
+                    onclick: move |_| {
+                        let s = (*scale.read() + 0.1).min(3.0);
+                        scale.set(s);
+                    },
+                    "[ + ]"
+                }
+                button {
+                    class: "toolbar-btn",
+                    onclick: move |_| {
+                        let s = (*scale.read() - 0.1).max(0.2);
+                        scale.set(s);
+                    },
+                    "[ - ]"
+                }
+                button {
+                    class: "toolbar-btn",
+                    onclick: move |_| {
+                        scale.set(1.0);
+                        offset_x.set(0.0);
+                        offset_y.set(0.0);
+                    },
+                    "[ RESET ]"
+                }
+            }
+
+            // canvas area
+            div {
+                style: "width: 100%; height: 100%; overflow: hidden;",
+
+                // scroll wheel zoom
+                onwheel: move |e| {
+                let delta_y = e.delta().strip_units().y;
+                let delta_x = e.delta().strip_units().x;
+
+                if e.modifiers().ctrl() {// pinch or ctrl+scroll = zoom
+                    let new_scale = if delta_y < 0.0 {
+                        (*scale.read() + 0.08).min(3.0)
+                } else {
+                (*scale.read() - 0.08).max(0.2)
+                };
+                scale.set(new_scale);
+                } else {
+                        // 2-finger scroll = pan
+                        let new_x = *offset_x.read() - delta_x;
+                        let new_y = *offset_y.read() - delta_y;
+                        offset_x.set(new_x);
+                        offset_y.set(new_y);
+                 }
+            },
+
+                // drag to pan
+                onmousedown: move |e| {
+                    is_dragging.set(true);
+                    drag_start_x.set(e.client_coordinates().x - *offset_x.read());
+                    drag_start_y.set(e.client_coordinates().y - *offset_y.read());
+                },
+                onmousemove: move |e| {
+                    if *is_dragging.read() {
+                        offset_x.set(e.client_coordinates().x - *drag_start_x.read());
+                        offset_y.set(e.client_coordinates().y - *drag_start_y.read());
+                    }
+                },
+                onmouseup: move |_| is_dragging.set(false),
+                onmouseleave: move |_| is_dragging.set(false),
 
                 svg {
                     width: "{canvas_width}",
                     height: "{CANVAS_HEIGHT}",
                     xmlns: "http://www.w3.org/2000/svg",
+                    style: "transform: scale({scale}) translate({offset_x}px, {offset_y}px); transform-origin: 0 0; display: block;",
 
-                    // Subtle dot grid background
                     defs {
                         pattern {
                             id: "dotgrid",
@@ -66,7 +138,7 @@ pub fn TreeCanvas(
                     }
                     rect { width: "100%", height: "100%", fill: "url(#dotgrid)" }
 
-                    // Main branch line — full width, dead center
+                    // main branch line
                     line {
                         x1: "40",
                         y1: "{V_MAIN}",
@@ -77,17 +149,15 @@ pub fn TreeCanvas(
                         opacity: "0.6"
                     }
 
-                    // Branch bezier curves for merge commits
+                    // branch bezier curves
                     for (commit, x, y) in &positioned {
                         if commit.is_merge {
-                            // curve from main → branch node
                             path {
                                 d: bezier(*x - H_SPACING, V_MAIN, *x, *y),
                                 stroke: "{commit.color}",
                                 stroke_width: "1.5",
                                 fill: "none"
                             }
-                            // curve from branch node → back to main
                             path {
                                 d: bezier(*x, *y, *x + H_SPACING, V_MAIN),
                                 stroke: "{commit.color}",
@@ -97,7 +167,7 @@ pub fn TreeCanvas(
                         }
                     }
 
-                    // Commit nodes on top
+                    // commit nodes
                     for (commit, x, y) in positioned {
                         CommitDot {
                             commit: commit.clone(),
@@ -122,11 +192,7 @@ fn CommitDot(
     on_click: EventHandler<CommitNode>,
 ) -> Element {
     let color = commit.color.clone();
-    let fill = if selected {
-        color.clone()
-    } else {
-        "#000000".to_string()
-    };
+    let fill = if selected { color.clone() } else { "#000000".to_string() };
     let stroke_w = if selected { "3" } else { "2" };
     let c = commit.clone();
 
@@ -135,7 +201,6 @@ fn CommitDot(
             style: "cursor: pointer;",
             onclick: move |_| on_click.call(c.clone()),
 
-            // Glow ring when selected
             if selected {
                 circle {
                     cx: "{x}", cy: "{y}",
@@ -147,7 +212,6 @@ fn CommitDot(
                 }
             }
 
-            // Main circle
             circle {
                 cx: "{x}", cy: "{y}",
                 r: "{NODE_RADIUS}",
@@ -156,7 +220,6 @@ fn CommitDot(
                 stroke_width: "{stroke_w}"
             }
 
-            // HEAD label above node
             if commit.is_head {
                 text {
                     x: "{x}", y: "{y - NODE_RADIUS - 14.0}",
@@ -170,7 +233,6 @@ fn CommitDot(
                 }
             }
 
-            // Tag badges
             for (i, tag) in commit.tags.iter().enumerate() {
                 text {
                     x: "{x}", y: "{y - NODE_RADIUS - 28.0 - (i as f64 * 15.0)}",
@@ -182,7 +244,6 @@ fn CommitDot(
                 }
             }
 
-            // Short hash below node
             text {
                 x: "{x}", y: "{y + NODE_RADIUS + 18.0}",
                 text_anchor: "middle",
@@ -193,7 +254,6 @@ fn CommitDot(
                 "{commit.short_hash}"
             }
 
-            // Merge indicator dot inside circle
             if commit.is_merge {
                 text {
                     x: "{x}", y: "{y + 4.0}",
