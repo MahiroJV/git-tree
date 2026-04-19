@@ -143,17 +143,55 @@ dx build --platform desktop --release
 
 ---
 
-## Roadmap
-
-| Version | Features |
-|---|---|
-| **v0.1** | ✅ tree render, click panels, 9 themes, contributor colors, local + remote |
-| **v0.2** | zoom + pan, keyboard navigation, search by author/message/hash, diff viewer, minimap |
-| **v0.3** | repo stats screen, export SVG/PNG, animations, CRT overlay, copy hash, open in browser |
-| **v1.0** | full polish, recent repos list, AppImage packaging, Android port via Dioxus mobile |
+## 🚀 Roadmap
 
 ---
 
+### 🧱 v0.1 — Foundation
+- [x] Tree visualization
+- [x] Click panels (commit info + diff stats)
+- [x] 9 themes
+- [x] Contributor colors
+- [x] Local + remote clone
+- [x] Zoom + pan
+- [x] App icon
+
+---
+
+### 🧪 v0.2 — Usability
+- [ ] Search by author / message / hash
+- [ ] Diff viewer (actual +/- code lines)
+- [ ] Keyboard navigation (arrow keys between commits)
+- [ ] Fix font loading (Oxanium offline)
+- [ ] Recent repositories list
+- [ ] Copy hash button
+
+---
+
+### 🎨 v0.3 — Polish
+- [ ] Minimap (corner overview)
+- [ ] Repo stats (leaderboard + heatmap)
+- [ ] Export (SVG / PNG)
+- [ ] CRT scanline overlay (toggleable)
+- [ ] Open commit in browser (GitHub / GitLab)
+- [ ] Node pulse animation on click
+
+---
+
+### 🖥️ v0.4 — Platform
+- [ ] GitHub OAuth login
+- [ ] Private repo access
+- [ ] Windows + macOS builds (CI)
+- [ ] Linux AppImage packaging
+
+---
+
+### 🏁 v1.0 — Release
+- [ ] Android port (Dioxus mobile)
+- [ ] Full keyboard shortcut system
+- [ ] Performance improvements (lazy loading for huge repos)
+- [ ] Settings panel (font size, animations toggle)
+- [ ] Community themes
 ## Project Structure
 
 ```
