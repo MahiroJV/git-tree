@@ -1,4 +1,10 @@
 /* git-tree — Terminal Style */
+@font-face {
+    font-family: 'Oxanium';
+    src: url('Oxanium.ttf') format('truetype');
+    font-weight: 300 600;
+}
+
 :root {
     --bg: #000000;
     --bg-secondary: #0a0a0a;
@@ -256,7 +262,7 @@ html, body, #main {
 
 
 .ascii-header {
-    font-family: 'Oxanium', sans-serif;
+    font-family: var(--font);
     font-size: 62px;
     font-weight: 600;
     letter-spacing: 0.3em;
