@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg data-v-fde0c5aa="" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" class="iconLeftSlogan">
-  <rect data-v-fde0c5aa="" width="300" height="300" class="logo-background-square" style="stroke-width: 0px;" rx="37.108" ry="37.108" y="0.001"/>
+  <rect data-v-fde0c5aa="" width="300" height="300" class="logo-background-square" style="stroke-width: 0px; fill: rgb(255, 255, 255);" rx="37.108" ry="37.108" y="0.001"/>
   <defs data-v-fde0c5aa="">
     <linearGradient data-v-fde0c5aa="" gradientTransform="rotate(25)" id="6a11ba33-aa0b-4f40-8f33-55a523a1fd08" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop data-v-fde0c5aa="" offset="0" stop-color="#8E42D3" stop-opacity="1"/>
