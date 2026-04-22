@@ -2,6 +2,7 @@
 use dioxus::desktop::tao::window::Icon;
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
+#[allow(unused_imports)]
 use image::load_from_memory;
 
 mod app;
