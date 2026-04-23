@@ -82,9 +82,11 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         button {
                             class: "btn-primary",
                             onclick: move |_| {
-                                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                    local_path.set(path.to_string_lossy().to_string());
-                                }
+                                spawn(async move {
+                                    if let Some(folder) = rfd::AsyncFileDialog::new().pick_folder().await {
+                                        local_path.set(folder.path().to_string_lossy().to_string());
+                                    }
+                                });
                             },
                             "📁"
                         }
