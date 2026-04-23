@@ -462,3 +462,67 @@ html, body, #main {
 
 /* ── Utilities ── */
 .text-muted { color: var(--text-muted); }
+
+/* ── Recent Repos ── */
+.recent-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 580px;
+}
+
+.recent-title {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.recent-empty {
+    font-size: 10px;
+    text-align: center;
+    letter-spacing: 0.1em;
+}
+
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.recent-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid #1a1a1a;
+    cursor: pointer;
+    background: var(--bg-secondary);
+    transition: border-color 0.15s;
+    overflow: hidden;
+}
+.recent-item:hover { border-color: rgba(155, 93, 229, 0.4); }
+
+.recent-item-name {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+    min-width: 70px;
+}
+
+.recent-item-path {
+    font-size: 10px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-item-time {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}

@@ -20,74 +20,83 @@ pub fn LeftPanel(commit: Option<CommitNode>) -> Element {
                             p { class: "text-muted", ">" }
                         }
                     },
-                    Some(c) => rsx! {
-                        div { class: "panel-content",
+                    Some(c) => {
+                        let mut copy_label = use_signal(|| "⎘");
 
-                            div { class: "info-row",
-                                span { class: "info-label", "AUTHOR" }
-                                span { class: "info-value", {c.author_name.clone()} }
-                            }
+                        rsx! {
+                            div { class: "panel-content",
 
-                            div { class: "info-row",
-                                span { class: "info-label", "EMAIL" }
-                                span {
-                                    class: "info-value info-email",
-                                    style: format!("color: {};", c.color),
-                                    {c.author_email.clone()}
+                                div { class: "info-row",
+                                    span { class: "info-label", "AUTHOR" }
+                                    span { class: "info-value", {c.author_name.clone()} }
                                 }
-                            }
 
-                            div { class: "info-row",
-                                span { class: "info-label", "DATE" }
-                                span { class: "info-value",
-                                    {c.timestamp.format("%Y-%m-%d %H:%M UTC").to_string()}
+                                div { class: "info-row",
+                                    span { class: "info-label", "EMAIL" }
+                                    span {
+                                        class: "info-value info-email",
+                                        style: format!("color: {};", c.color),
+                                        {c.author_email.clone()}
+                                    }
                                 }
-                            }
 
-                            div { class: "info-row",
-                                span { class: "info-label", "HASH" }
-                                div { class: "hash-row",
-                                    span { class: "info-value hash", {c.short_hash.clone()} }
-                                    button { class: "copy-btn", title: "Copy full hash", "⎘" }
+                                div { class: "info-row",
+                                    span { class: "info-label", "DATE" }
+                                    span { class: "info-value",
+                                        {c.timestamp.format("%Y-%m-%d %H:%M UTC").to_string()}
+                                    }
                                 }
-                            }
 
-                            {
-                                if !c.tags.is_empty() {
-                                    rsx! {
-                                        div { class: "info-row",
-                                            span { class: "info-label", "TAGS" }
-                                            div { class: "tag-list",
-                                                for tag in &c.tags {
-                                                    span { class: "tag-badge", {format!("◆ {}", tag)} }
+                                div { class: "info-row",
+                                    span { class: "info-label", "HASH" }
+                                    div { class: "hash-row",
+                                        span { class: "info-value hash", {c.short_hash.clone()} }
+                                        button {
+                                            class: "copy-btn",
+                                            title: "Copy full hash",
+                                            onclick: {
+                                                let full_hash = c.hash.clone();
+                                                move |_| {
+                                                    if let Ok(mut cb) = arboard::Clipboard::new() {
+                                                        let _ = cb.set_text(full_hash.clone());
+                                                        copy_label.set("✓");
+                                                        // reset after 1.5s
+                                                        spawn(async move {
+                                                            tokio::time::sleep(
+                                                                std::time::Duration::from_millis(1500)
+                                                            ).await;
+                                                            copy_label.set("⎘");
+                                                        });
+                                                    }
+                                                }
+                                            },
+                                            {*copy_label.read()}
+                                        }
+                                    }
+                                }
+
+                                {
+                                    if !c.tags.is_empty() {
+                                        rsx! {
+                                            div { class: "info-row",
+                                                span { class: "info-label", "TAGS" }
+                                                div { class: "tag-list",
+                                                    for tag in &c.tags {
+                                                        span { class: "tag-badge", {format!("◆ {}", tag)} }
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                } else {
-                                    rsx! {}
+                                    } else { rsx! {} }
                                 }
-                            }
 
-                            div { class: "divider" }
+                                div { class: "divider" }
 
-                            div { class: "info-label", "MESSAGE" }
-                            div { class: "commit-message", {c.full_message.clone()} }
+                                div { class: "info-label", "MESSAGE" }
+                                div { class: "commit-message", {c.full_message.clone()} }
 
-                            {
-                                if c.is_head {
-                                    rsx! { div { class: "badge badge-head", "● HEAD" } }
-                                } else {
-                                    rsx! {}
-                                }
-                            }
-
-                            {
-                                if c.is_merge {
-                                    rsx! { div { class: "badge badge-merge", "⇄ MERGE COMMIT" } }
-                                } else {
-                                    rsx! {}
-                                }
+                                { if c.is_head  { rsx! { div { class: "badge badge-head",  "● HEAD"        } } } else { rsx! {} } }
+                                { if c.is_merge { rsx! { div { class: "badge badge-merge", "⇄ MERGE COMMIT"} } } else { rsx! {} } }
                             }
                         }
                     }

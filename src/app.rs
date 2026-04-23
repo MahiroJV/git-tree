@@ -84,6 +84,7 @@ pub fn App() -> Element {
                             tree: repo_tree.read().clone(),
                             selected_hash: selected_commit.read().as_ref().map(|c| c.hash.clone()),
                             on_select: move |commit: CommitNode| selected_commit.set(Some(commit)),
+                            on_deselect: move |_| selected_commit.set(None),
                         }
                         RightPanel { commit: selected_commit.read().clone() }
                     }

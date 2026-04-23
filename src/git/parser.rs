@@ -115,20 +115,54 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         let author_email = author.email().unwrap_or("").to_string();
         let color = contributor_color(&author_email).to_string();
 
-        // Get diff stats vs first parent
-        let stats = if let Some(parent) = commit.parents().next() {
+        // ── Diff: stats + file list ──────────────────────────────────────
+        let commit_tree = commit.tree()?;
+        let diff = if let Some(parent) = commit.parents().next() {
             let parent_tree = parent.tree()?;
-            let commit_tree = commit.tree()?;
-            let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)?;
-            let s = diff.stats()?;
-            DiffStats {
-                files_changed: s.files_changed(),
-                insertions: s.insertions(),
-                deletions: s.deletions(),
-            }
+            repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)?
         } else {
-            DiffStats::default()
+            // Initial commit — diff against empty tree
+            repo.diff_tree_to_tree(None, Some(&commit_tree), None)?
         };
+
+        let mut files_changed: Vec<FileChange> = Vec::new();
+        diff.foreach(
+            &mut |delta, _| {
+                let path = delta
+                    .new_file()
+                    .path()
+                    .or_else(|| delta.old_file().path())
+                    .and_then(|p| p.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                let status = match delta.status() {
+                    git2::Delta::Added => ChangeStatus::Added,
+                    git2::Delta::Deleted => ChangeStatus::Deleted,
+                    git2::Delta::Renamed => ChangeStatus::Renamed,
+                    _ => ChangeStatus::Modified,
+                };
+
+                files_changed.push(FileChange {
+                    path,
+                    additions: 0,
+                    deletions: 0,
+                    status,
+                });
+                true
+            },
+            None,
+            None,
+            None,
+        )?;
+
+        let diff_stats = diff.stats()?;
+        let stats = DiffStats {
+            files_changed: diff_stats.files_changed(),
+            insertions: diff_stats.insertions(),
+            deletions: diff_stats.deletions(),
+        };
+        // ── End diff ──────────────────────────────────────────────────────
 
         let hash = oid.to_string();
         let short_hash = hash[..7].to_string();
@@ -155,7 +189,7 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             is_merge,
             is_head,
             tags,
-            files_changed: Vec::new(),
+            files_changed,
             stats,
             branch_name: None,
             hash,

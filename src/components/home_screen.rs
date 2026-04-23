@@ -1,6 +1,7 @@
 // components/home_screen.rs — Landing screen
 use crate::git::loader;
 use crate::git::parser::RepoTree;
+use crate::recent;
 use dioxus::prelude::*;
 #[allow(unused_imports)]
 use rfd::FileDialog;
@@ -17,6 +18,26 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut remote_url = use_signal(String::new);
     let mut error = use_signal(|| Option::<String>::None);
     let mut tab = use_signal(|| "local");
+    #[allow(clippy::redundant_closure)]
+    let mut recent_repos = use_signal(|| recent::load_recent());
+
+    //Helpers
+    let mut open_local = move |path_str: String| {
+        if path_str.is_empty() {
+            error.set(Some("Please enter a path.".into()));
+            return;
+        }
+        props.on_loading.call("reading commits...".into());
+        let path = std::path::PathBuf::from(&path_str);
+        match loader::load_local(&path) {
+            Ok(tree) => {
+                let _ = recent::save_recent(&path_str, &tree.repo_name);
+                recent_repos.set(recent::load_recent());
+                props.on_load.call(tree);
+            }
+            Err(e) => error.set(Some(format!("Error: {e}"))),
+        }
+    };
 
     rsx! {
         div {
@@ -120,9 +141,32 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                 }
             }
 
+             // ── Recent repos ─────────────────────────────────────
             div { class: "recent-section",
-                p { class: "text-muted", "— RECENT REPOS (coming in v0.2) —" }
+                p { class: "recent-title", "— RECENT REPOS —" }
+
+                if recent_repos.read().is_empty() {
+                    p { class: "text-muted recent-empty", "no recent repos yet" }
+                } else {
+                    div { class: "recent-list",
+                        for repo in recent_repos.read().clone() {
+                            {
+                                let path_str = repo.path.clone();
+                                rsx! {
+                                    div {
+                                        class: "recent-item",
+                                        onclick: move |_| open_local(path_str.clone()),
+                                        span { class: "recent-item-name", "{repo.name}" }
+                                        span { class: "recent-item-path text-muted", "{repo.path}" }
+                                        span { class: "recent-item-time text-muted", "{repo.opened_at}" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+
 
             div { class: "home-footer",
                 span { class: "text-muted", "git-tree v0.1 · built with Rust + Dioxus" }

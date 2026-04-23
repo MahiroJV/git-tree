@@ -1,4 +1,4 @@
-// components/tree_canvas.rs — SVG tree visualization with zoom + pan
+// components/tree_canvas.rs — SVG tree visualization with zoom + pan + keyboard nav
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
@@ -15,6 +15,7 @@ pub fn TreeCanvas(
     tree: Option<RepoTree>,
     selected_hash: Option<String>,
     on_select: EventHandler<CommitNode>,
+    on_deselect: EventHandler<()>, // ← NEW: Escape key
 ) -> Element {
     let mut scale = use_signal(|| 1.0_f64);
     let mut offset_x = use_signal(|| 0.0_f64);
@@ -51,17 +52,63 @@ pub fn TreeCanvas(
         })
         .collect();
 
+    // ── keyboard handler ────────────────────────────────────────────────────
+    // Find current index so arrow keys know where to go
+    let commits_for_kb = positioned
+        .iter()
+        .map(|(c, _, _)| c.clone())
+        .collect::<Vec<_>>();
+
+    let handle_key = {
+        let commits = commits_for_kb.clone();
+        let selected = selected_hash.clone();
+        move |e: KeyboardEvent| match e.key() {
+            Key::ArrowRight => {
+                let next = match &selected {
+                    None => commits.first().cloned(),
+                    Some(h) => {
+                        let idx = commits.iter().position(|c| &c.hash == h);
+                        idx.and_then(|i| commits.get(i + 1)).cloned()
+                    }
+                };
+                if let Some(c) = next {
+                    on_select.call(c);
+                }
+            }
+            Key::ArrowLeft => {
+                let prev = match &selected {
+                    None => commits.last().cloned(),
+                    Some(h) => {
+                        let idx = commits.iter().position(|c| &c.hash == h);
+                        idx.and_then(|i| i.checked_sub(1).and_then(|j| commits.get(j)))
+                            .cloned()
+                    }
+                };
+                if let Some(c) = prev {
+                    on_select.call(c);
+                }
+            }
+            Key::Escape => {
+                on_deselect.call(());
+            }
+            _ => {}
+        }
+    };
+
     rsx! {
         div {
             class: "canvas-wrapper",
-            style: "overflow: hidden; cursor: grab; position: relative;",
+            // tabIndex so div can receive keyboard events; outline:none hides focus ring
+            tabindex: "0",
+            style: "overflow: hidden; cursor: grab; position: relative; outline: none;",
+            onkeydown: handle_key,
 
-            // zoom controls
+            // ── zoom controls ───────────────────────────────────────────────
             div {
                 style: "position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px;",
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| {
+                     onclick: move |_| {
                         let s = (*scale.read() + 0.1).min(3.0);
                         scale.set(s);
                     },
@@ -69,7 +116,7 @@ pub fn TreeCanvas(
                 }
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| {
+                     onclick: move |_| {
                         let s = (*scale.read() - 0.1).max(0.2);
                         scale.set(s);
                     },
@@ -77,41 +124,41 @@ pub fn TreeCanvas(
                 }
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| {
-                        scale.set(1.0);
-                        offset_x.set(0.0);
-                        offset_y.set(0.0);
-                    },
+                    onclick: move |_| { scale.set(1.0); offset_x.set(0.0); offset_y.set(0.0); },
                     "[ RESET ]"
                 }
             }
 
-            // canvas area
+            // ── keyboard hint ───────────────────────────────────────────────
+            div {
+                style: "position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+                        z-index: 10; color: var(--text-muted); font-size: 10px;
+                        letter-spacing: 0.12em; pointer-events: none;",
+                "← → navigate  ·  ESC deselect  ·  CTRL+scroll zoom  ·  drag pan"
+            }
+
+            // ── canvas area ─────────────────────────────────────────────────
             div {
                 style: "width: 100%; height: 100%; overflow: hidden;",
 
-                // scroll wheel zoom
                 onwheel: move |e| {
-                let delta_y = e.delta().strip_units().y;
-                let delta_x = e.delta().strip_units().x;
-
-                if e.modifiers().ctrl() {// pinch or ctrl+scroll = zoom
-                    let new_scale = if delta_y < 0.0 {
-                        (*scale.read() + 0.08).min(3.0)
-                } else {
-                (*scale.read() - 0.08).max(0.2)
-                };
-                scale.set(new_scale);
-                } else {
-                        // 2-finger scroll = pan
+                    let delta_y = e.delta().strip_units().y;
+                    let delta_x = e.delta().strip_units().x;
+                    if e.modifiers().ctrl() {
+                        let s = if delta_y < 0.0 {
+                            (*scale.read() + 0.08).min(3.0)
+                        } else {
+                            (*scale.read() - 0.08).max(0.2)
+                        };
+                        scale.set(s);
+                    } else {
                         let new_x = *offset_x.read() - delta_x;
                         let new_y = *offset_y.read() - delta_y;
                         offset_x.set(new_x);
                         offset_y.set(new_y);
-                 }
-            },
+                    }
+                },
 
-                // drag to pan
                 onmousedown: move |e| {
                     is_dragging.set(true);
                     drag_start_x.set(e.client_coordinates().x - *offset_x.read());
@@ -123,7 +170,7 @@ pub fn TreeCanvas(
                         offset_y.set(e.client_coordinates().y - *drag_start_y.read());
                     }
                 },
-                onmouseup: move |_| is_dragging.set(false),
+                onmouseup:    move |_| is_dragging.set(false),
                 onmouseleave: move |_| is_dragging.set(false),
 
                 svg {
@@ -153,7 +200,7 @@ pub fn TreeCanvas(
                         opacity: "0.6"
                     }
 
-                    // branch bezier curves
+                    // branch Bézier curves
                     for (commit, x, y) in &positioned {
                         if commit.is_merge {
                             path {

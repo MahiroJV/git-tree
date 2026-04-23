@@ -8,6 +8,7 @@ use image::load_from_memory;
 mod app;
 mod components;
 mod git;
+mod recent;
 mod theme;
 
 use app::App;
