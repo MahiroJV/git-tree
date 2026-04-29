@@ -4,7 +4,9 @@ use dioxus::prelude::*;
 #[component]
 pub fn Toolbar(
     repo_name: String,
+    search_query: String,
     on_home: EventHandler<()>,
+    on_search: EventHandler<String>,
     on_settings: EventHandler<()>,
     on_refresh: EventHandler<()>,
 ) -> Element {
@@ -23,10 +25,30 @@ pub fn Toolbar(
 
             // Center — repo name
             div { class: "toolbar-center",
-                if !repo_name.is_empty() {
-                    span { class: "toolbar-repo", "/ {repo_name}" }
+                div { class: "toolbar-search-wrap",
+                    span { class: "toolbar-search-prompt", ">" }
+                    input {
+                        class: "toolbar-search-input",
+                        r#type: "text",
+                        placeholder: if repo_name.is_empty() {
+                            "search commits...".to_string()
+                        } else {
+                            format!("search in {}...", repo_name)
+                        },
+                        value: "{search_query}",
+                        oninput: move |e| on_search.call(e.value()),
+                    }
+                    // live match indicator — only visible when typing
+                    if !search_query.is_empty() {
+                        button {
+                            class: "toolbar-search-clear",
+                            onclick: move |_| on_search.call(String::new()),
+                            "✕"
+                        }
+                    }
                 }
             }
+
 
             // Right — buttons always visible
             div { class: "toolbar-right",

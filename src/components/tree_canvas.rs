@@ -10,12 +10,26 @@ const V_MAIN: f64 = 250.0;
 const V_BRANCH_UP: f64 = 130.0;
 const V_BRANCH_DOWN: f64 = 370.0;
 
+fn commit_matches(commit: &CommitNode, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    let q = query.to_lowercase();
+    commit.author_name.to_lowercase().contains(&q)
+        || commit.author_email.to_lowercase().contains(&q)
+        || commit.message.to_lowercase().contains(&q)
+        || commit.full_message.to_lowercase().contains(&q)
+        || commit.short_hash.to_lowercase().contains(&q)
+        || commit.hash.to_lowercase().contains(&q)
+}
+
 #[component]
 pub fn TreeCanvas(
     tree: Option<RepoTree>,
     selected_hash: Option<String>,
+    search_query: String,
     on_select: EventHandler<CommitNode>,
-    on_deselect: EventHandler<()>, // ← NEW: Escape key
+    on_deselect: EventHandler<()>,
 ) -> Element {
     let mut scale = use_signal(|| 1.0_f64);
     let mut offset_x = use_signal(|| 0.0_f64);
@@ -33,7 +47,7 @@ pub fn TreeCanvas(
     let commit_count = tree.commits.len().max(1);
     let canvas_width = (commit_count as f64 * H_SPACING) + 200.0;
 
-    let positioned: Vec<(CommitNode, f64, f64)> = tree
+    let positioned: Vec<(CommitNode, f64, f64, bool)> = tree
         .commits
         .iter()
         .enumerate()
@@ -48,15 +62,24 @@ pub fn TreeCanvas(
             } else {
                 V_MAIN
             };
-            (commit.clone(), x, y)
+            let matches = commit_matches(commit, &search_query);
+            (commit.clone(), x, y, matches)
+
         })
         .collect();
+    // Match count for the hint label
+    let match_count = if search_query.is_empty() {
+        None
+    } else {
+        Some(positioned.iter().filter(|(_, _, _, m)| *m).count())
+    };
 
     // ── keyboard handler ────────────────────────────────────────────────────
     // Find current index so arrow keys know where to go
     let commits_for_kb = positioned
         .iter()
-        .map(|(c, _, _)| c.clone())
+        .filter(|(_, _, _, m)| *m)
+        .map(|(c, _, _, _)| c.clone())
         .collect::<Vec<_>>();
 
     let handle_key = {
@@ -133,9 +156,15 @@ pub fn TreeCanvas(
             div {
                 style: "position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
                         z-index: 10; color: var(--text-muted); font-size: 10px;
-                        letter-spacing: 0.12em; pointer-events: none;",
-                "← → navigate  ·  ESC deselect  ·  CTRL+scroll zoom  ·  drag pan"
+                        letter-spacing: 0.12em; pointer-events: none; white-space: nowrap;",
+                {
+                    match match_count {
+                        Some(n) => format!("{n} match{}  ·  ← → navigate  ·  ESC deselect", if n == 1 { "" } else { "es" }),
+                        None => "← → navigate  ·  ESC deselect  ·  CTRL+scroll zoom  ·  drag pan".to_string(),
+                    }
+                }
             }
+
 
             // ── canvas area ─────────────────────────────────────────────────
             div {
@@ -197,34 +226,42 @@ pub fn TreeCanvas(
                         y2: "{V_MAIN}",
                         stroke: "var(--accent)",
                         stroke_width: "2",
-                        opacity: "0.6"
+                        opacity: if search_query.is_empty() { "0.6" } else { "0.15" }
                     }
 
                     // branch Bézier curves
-                    for (commit, x, y) in &positioned {
+                    for (commit, x, y, matches) in &positioned {
                         if commit.is_merge {
-                            path {
-                                d: bezier(*x - H_SPACING, V_MAIN, *x, *y),
-                                stroke: "{commit.color}",
-                                stroke_width: "1.5",
-                                fill: "none"
-                            }
-                            path {
-                                d: bezier(*x, *y, *x + H_SPACING, V_MAIN),
-                                stroke: "{commit.color}",
-                                stroke_width: "1.5",
-                                fill: "none"
+                            {
+                                let opacity = if search_query.is_empty() || *matches { "1" } else { "0.08" };
+                                rsx! {
+                                    path {
+                                        d: bezier(*x - H_SPACING, V_MAIN, *x, *y),
+                                        stroke: "{commit.color}",
+                                        stroke_width: "1.5",
+                                        fill: "none",
+                                        opacity: "{opacity}"
+                                    }
+                                    path {
+                                        d: bezier(*x, *y, *x + H_SPACING, V_MAIN),
+                                        stroke: "{commit.color}",
+                                        stroke_width: "1.5",
+                                        fill: "none",
+                                        opacity: "{opacity}"
+                                    }
+                                }
                             }
                         }
                     }
 
                     // commit nodes
-                    for (commit, x, y) in positioned {
+                    for (commit, x, y, matches) in positioned {
                         CommitDot {
                             commit: commit.clone(),
                             x,
                             y,
                             selected: selected_hash.as_deref() == Some(&commit.hash),
+                            dimmed: !search_query.is_empty() && !matches,
                             on_click: on_select,
                         }
                     }
@@ -240,6 +277,7 @@ fn CommitDot(
     x: f64,
     y: f64,
     selected: bool,
+    dimmed: bool,
     on_click: EventHandler<CommitNode>,
 ) -> Element {
     let color = commit.color.clone();
@@ -249,12 +287,15 @@ fn CommitDot(
         "#000000".to_string()
     };
     let stroke_w = if selected { "3" } else { "2" };
+    let opacity = if dimmed { "0.08" } else { "1" };
     let c = commit.clone();
 
     rsx! {
         g {
-            style: "cursor: pointer;",
-            onclick: move |_| on_click.call(c.clone()),
+            style: "cursor: pointer; opacity: {opacity};",
+            onclick: move |_| {
+                if !dimmed { on_click.call(c.clone()); }
+            },
 
             if selected {
                 circle {

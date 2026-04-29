@@ -89,7 +89,7 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
     walk.push_glob("refs/remotes/*")?;
 
     // Topological sort so parent/child order is correct
-    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
+    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME | git2::Sort::REVERSE)?;
 
     let mut commits: Vec<CommitNode> = Vec::new();
     let head_id = repo.head().ok().and_then(|h| h.target());

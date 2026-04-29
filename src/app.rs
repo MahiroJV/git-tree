@@ -24,6 +24,7 @@ pub fn App() -> Element {
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
     let mut theme_name = use_signal(|| "Terminal".to_string());
+    let mut search_query = use_signal(|| String::new());
 
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
@@ -34,9 +35,7 @@ pub fn App() -> Element {
     });
 
     rsx! {
-        // Inject base CSS
         style { "{BASE_CSS}" }
-        // Inject theme CSS variables on top
         style { "{theme_css}" }
 
         div {
@@ -46,7 +45,12 @@ pub fn App() -> Element {
                 Screen::Tree => rsx! {
                     Toolbar {
                         repo_name: repo_tree.read().as_ref().map(|r| r.repo_name.clone()).unwrap_or_default(),
-                        on_home: move |_| screen.set(Screen::Home),
+                        search_query: search_query.read().clone(),
+                        on_search: move |q: String| search_query.set(q),
+                        on_home: move |_| {
+                            search_query.set(String::new());
+                            screen.set(Screen::Home);
+                        },
                         on_settings: move |_| screen.set(Screen::Settings),
                         on_refresh: move |_| {},
                     }
@@ -60,6 +64,7 @@ pub fn App() -> Element {
                         on_load: move |tree: RepoTree| {
                             repo_tree.set(Some(tree));
                             selected_commit.set(None);
+                            search_query.set(String::new());
                             screen.set(Screen::Tree);
                         },
                         on_loading: move |msg: String| {
@@ -83,6 +88,7 @@ pub fn App() -> Element {
                         TreeCanvas {
                             tree: repo_tree.read().clone(),
                             selected_hash: selected_commit.read().as_ref().map(|c| c.hash.clone()),
+                            search_query: search_query.read().clone(),
                             on_select: move |commit: CommitNode| selected_commit.set(Some(commit)),
                             on_deselect: move |_| selected_commit.set(None),
                         }

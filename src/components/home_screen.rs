@@ -18,6 +18,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut remote_url = use_signal(String::new);
     let mut error = use_signal(|| Option::<String>::None);
     let mut tab = use_signal(|| "local");
+    let mut recent_search = use_signal(String::new);
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());
 
@@ -38,6 +39,22 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             Err(e) => error.set(Some(format!("Error: {e}"))),
         }
     };
+
+    // Filtered recent repos — live as user types
+    let filtered_recents = use_memo(move || {
+        let q = recent_search.read().to_lowercase();
+        recent_repos
+            .read()
+            .iter()
+            .filter(|r| {
+                q.is_empty()
+                    || r.name.to_lowercase().contains(&q)
+                    || r.path.to_lowercase().contains(&q)
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    });
+
 
     rsx! {
         div {
@@ -143,15 +160,38 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                 }
             }
 
-             // ── Recent repos ─────────────────────────────────────
+            // ── Recent repos ─────────────────────────────────────
             div { class: "recent-section",
                 p { class: "recent-title", "— RECENT REPOS —" }
 
+                // Search input for recents — only show if there are repos to filter
+                if !recent_repos.read().is_empty() {
+                    div { class: "input-group recent-search-wrap",
+                        span { class: "prompt", ">" }
+                        input {
+                            class: "terminal-input",
+                            r#type: "text",
+                            placeholder: "filter recent...",
+                            value: "{recent_search}",
+                            oninput: move |e| recent_search.set(e.value()),
+                        }
+                        if !recent_search.read().is_empty() {
+                            button {
+                                class: "btn-primary",
+                                onclick: move |_| recent_search.set(String::new()),
+                                "✕"
+                            }
+                        }
+                    }
+                }
+
                 if recent_repos.read().is_empty() {
                     p { class: "text-muted recent-empty", "no recent repos yet" }
+                } else if filtered_recents.read().is_empty() {
+                    p { class: "text-muted recent-empty", "no match" }
                 } else {
                     div { class: "recent-list",
-                        for repo in recent_repos.read().clone() {
+                        for repo in filtered_recents.read().clone() {
                             {
                                 let path_str = repo.path.clone();
                                 rsx! {
@@ -168,7 +208,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     }
                 }
             }
-
 
             div { class: "home-footer",
                 span { class: "text-muted", "git-tree v0.1 · built with Rust + Dioxus" }

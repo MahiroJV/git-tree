@@ -526,3 +526,65 @@ html, body, #main {
     letter-spacing: 0.05em;
     flex-shrink: 0;
 }
+
+/* ── Toolbar Search (append to end of style.css) ── */
+
+.toolbar-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(155, 93, 229, 0.3);
+    padding: 4px 10px;
+    background: var(--bg-secondary);
+    width: 100%;
+    max-width: 420px;
+    transition: border-color 0.15s;
+}
+.toolbar-search-wrap:focus-within {
+    border-color: var(--accent);
+}
+
+.toolbar-search-prompt {
+    color: var(--accent);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.toolbar-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    caret-color: var(--accent);
+    min-width: 0;
+}
+.toolbar-search-input::placeholder {
+    color: #333;
+    letter-spacing: 0.08em;
+}
+
+.toolbar-search-clear {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0 2px;
+    font-family: var(--font);
+    flex-shrink: 0;
+    line-height: 1;
+}
+.toolbar-search-clear:hover {
+    color: var(--danger);
+}
+
+/* Recent search input — slightly smaller than the main input-group */
+.recent-search-wrap {
+    padding: 5px 10px;
+    max-width: 580px;
+    width: 100%;
+}
