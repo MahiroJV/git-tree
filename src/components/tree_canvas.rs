@@ -64,7 +64,6 @@ pub fn TreeCanvas(
             };
             let matches = commit_matches(commit, &search_query);
             (commit.clone(), x, y, matches)
-
         })
         .collect();
     // Match count for the hint label

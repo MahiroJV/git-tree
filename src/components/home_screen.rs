@@ -55,7 +55,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             .collect::<Vec<_>>()
     });
 
-
     rsx! {
         div {
             class: "home-screen",
