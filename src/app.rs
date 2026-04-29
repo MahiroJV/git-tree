@@ -24,6 +24,7 @@ pub fn App() -> Element {
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
     let mut theme_name = use_signal(|| "Terminal".to_string());
+    #[allow(clippy::redundant_closure)]
     let mut search_query = use_signal(|| String::new());
 
     let theme_css = use_memo(move || {
