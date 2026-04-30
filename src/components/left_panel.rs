@@ -1,16 +1,12 @@
-use dioxus::document::eval;
 use crate::git::parser::CommitNode;
+use dioxus::document::eval;
 use dioxus::prelude::*;
 
 const PANEL_SHARED_CSS: &str = include_str!("../../assets/css/panel_shared.css");
 const LEFT_PANEL_CSS: &str = include_str!("../../assets/css/left_panel.css");
 
 #[component]
-pub fn LeftPanel(
-    commit: Option<CommitNode>,
-    open: bool,
-    on_toggle: EventHandler<()>,
-) -> Element {
+pub fn LeftPanel(commit: Option<CommitNode>, open: bool, on_toggle: EventHandler<()>) -> Element {
     // ── Collapsed state — thin strip ──────────────────────────────────────
     if !open {
         return rsx! {

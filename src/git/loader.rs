@@ -35,7 +35,9 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
             .clone(url, &clone_path)
             .with_context(|| format!("Failed to Clone {}", url))?
     };
-    parse_repo(&repo)
+    let result = parse_repo(&repo);
+    println!("load_remote result: {:?}", result.is_ok());
+    result
 }
 
 /// Fetch + pull latest changes for an already-loaded repo

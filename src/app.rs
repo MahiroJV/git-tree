@@ -1,11 +1,6 @@
 use crate::components::{
-    diff_viewer::DiffViewer,
-    home_screen::HomeScreen,
-    left_panel::LeftPanel,
-    right_panel::RightPanel,
-    settings::Settings,
-    toolbar::Toolbar,
-    tree_canvas::TreeCanvas,
+    diff_viewer::DiffViewer, home_screen::HomeScreen, left_panel::LeftPanel,
+    right_panel::RightPanel, settings::Settings, toolbar::Toolbar, tree_canvas::TreeCanvas,
 };
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;

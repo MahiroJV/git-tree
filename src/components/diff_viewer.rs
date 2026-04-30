@@ -122,19 +122,19 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
 
 fn status_label(s: &ChangeStatus) -> &'static str {
     match s {
-        ChangeStatus::Added    => "ADDED",
+        ChangeStatus::Added => "ADDED",
         ChangeStatus::Modified => "MODIFIED",
-        ChangeStatus::Deleted  => "DELETED",
-        ChangeStatus::Renamed  => "RENAMED",
+        ChangeStatus::Deleted => "DELETED",
+        ChangeStatus::Renamed => "RENAMED",
     }
 }
 
 fn status_class(s: &ChangeStatus) -> &'static str {
     match s {
-        ChangeStatus::Added    => "added",
+        ChangeStatus::Added => "added",
         ChangeStatus::Modified => "modified",
-        ChangeStatus::Deleted  => "deleted",
-        ChangeStatus::Renamed  => "renamed",
+        ChangeStatus::Deleted => "deleted",
+        ChangeStatus::Renamed => "renamed",
     }
 }
 
@@ -142,6 +142,6 @@ fn origin_class(c: char) -> &'static str {
     match c {
         '+' => "add",
         '-' => "del",
-        _   => "ctx",
+        _ => "ctx",
     }
 }

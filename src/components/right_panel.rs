@@ -144,18 +144,18 @@ pub fn RightPanel(
 
 fn status_label(s: &ChangeStatus) -> &'static str {
     match s {
-        ChangeStatus::Added    => "Added",
+        ChangeStatus::Added => "Added",
         ChangeStatus::Modified => "Modified",
-        ChangeStatus::Deleted  => "Deleted",
-        ChangeStatus::Renamed  => "Renamed",
+        ChangeStatus::Deleted => "Deleted",
+        ChangeStatus::Renamed => "Renamed",
     }
 }
 
 fn status_class(s: &ChangeStatus) -> &'static str {
     match s {
-        ChangeStatus::Added    => "added",
+        ChangeStatus::Added => "added",
         ChangeStatus::Modified => "modified",
-        ChangeStatus::Deleted  => "deleted",
-        ChangeStatus::Renamed  => "renamed",
+        ChangeStatus::Deleted => "deleted",
+        ChangeStatus::Renamed => "renamed",
     }
 }
