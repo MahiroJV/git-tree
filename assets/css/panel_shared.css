@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARED PANEL STYLES (collapse button, header, empty state)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.panel-collapse-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+.panel-collapse-btn:hover {
+    color: var(--accent);
+}
+
+.panel-collapse-btn--header {
+    margin-left: auto;
+    font-size: 10px;
+}
+
+.panel-collapsed-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    user-select: none;
+    margin-top: 4px;
+}
+
+.panel-empty {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    padding: 20px 14px;
+}

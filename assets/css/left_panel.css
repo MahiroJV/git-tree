@@ -1,0 +1,95 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEFT PANEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.left-panel--collapsed {
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0;
+    gap: 10px;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.commit-field-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    padding: 8px 14px 2px;
+    text-transform: uppercase;
+}
+
+.commit-field-value {
+    font-size: 11px;
+    color: var(--text);
+    padding: 0 14px 6px;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.commit-field-value--accent {
+    color: var(--accent);
+}
+
+.commit-hash-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px 6px;
+}
+
+.commit-hash-row .commit-field-value {
+    padding: 0;
+}
+
+.copy-hash-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.copy-hash-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.commit-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 14px 6px;
+}
+
+.commit-tag {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 2px 7px;
+    border-radius: 2px;
+}
+
+.commit-message-box {
+    font-size: 11px;
+    color: var(--text);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin: 0 14px 14px;
+    padding: 8px 10px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1;
+    overflow-y: auto;
+}

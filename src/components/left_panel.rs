@@ -1,107 +1,116 @@
-// components/left_panel.rs — Commit details panel
+use dioxus::document::eval;
 use crate::git::parser::CommitNode;
 use dioxus::prelude::*;
 
+const PANEL_SHARED_CSS: &str = include_str!("../../assets/css/panel_shared.css");
+const LEFT_PANEL_CSS: &str = include_str!("../../assets/css/left_panel.css");
+
 #[component]
-pub fn LeftPanel(commit: Option<CommitNode>) -> Element {
+pub fn LeftPanel(
+    commit: Option<CommitNode>,
+    open: bool,
+    on_toggle: EventHandler<()>,
+) -> Element {
+    // ── Collapsed state — thin strip ──────────────────────────────────────
+    if !open {
+        return rsx! {
+            style { "{PANEL_SHARED_CSS}" }
+            style { "{LEFT_PANEL_CSS}" }
+            div {
+                class: "panel left-panel left-panel--collapsed",
+                button {
+                    class: "panel-collapse-btn",
+                    title: "Expand commit info",
+                    onclick: move |_| on_toggle.call(()),
+                    "▶"
+                }
+                span { class: "panel-collapsed-label", "COMMIT INFO" }
+            }
+        };
+    }
+
+    // ── Expanded state ────────────────────────────────────────────────────
+    let Some(commit) = commit else {
+        return rsx! {
+            style { "{PANEL_SHARED_CSS}" }
+            style { "{LEFT_PANEL_CSS}" }
+            div {
+                class: "panel left-panel",
+                div {
+                    class: "panel-header",
+                    span { "// COMMIT INFO" }
+                    button {
+                        class: "panel-collapse-btn panel-collapse-btn--header",
+                        title: "Collapse",
+                        onclick: move |_| on_toggle.call(()),
+                        "◀"
+                    }
+                }
+                div {
+                    class: "panel-empty",
+                    "// select a commit"
+                }
+            }
+        };
+    };
+
+    let tags = commit.tags.clone();
+    let hash = commit.short_hash.clone();
+
     rsx! {
-        aside {
-            class: "panel panel-left",
+        style { "{PANEL_SHARED_CSS}" }
+        style { "{LEFT_PANEL_CSS}" }
+        div {
+            class: "panel left-panel",
 
-            div { class: "panel-header", "// COMMIT INFO" }
+            div {
+                class: "panel-header",
+                span { "// COMMIT INFO" }
+                button {
+                    class: "panel-collapse-btn panel-collapse-btn--header",
+                    title: "Collapse",
+                    onclick: move |_| on_toggle.call(()),
+                    "◀"
+                }
+            }
 
-            {
-                match &commit {
-                    None => rsx! {
-                        div { class: "panel-empty",
-                            p { class: "text-muted", ">" }
-                            p { class: "text-muted", "> SELECT A NODE" }
-                            p { class: "text-muted", "> TO VIEW DETAILS" }
-                            p { class: "text-muted", ">" }
-                        }
+            div { class: "commit-field-label", "AUTHOR" }
+            div { class: "commit-field-value", "{commit.author_name}" }
+
+            div { class: "commit-field-label", "EMAIL" }
+            div { class: "commit-field-value commit-field-value--accent", "{commit.author_email}" }
+
+            div { class: "commit-field-label", "DATE" }
+            div { class: "commit-field-value", "{commit.timestamp}" }
+
+            div { class: "commit-field-label", "HASH" }
+            div {
+                class: "commit-hash-row",
+                span { class: "commit-field-value commit-field-value--accent", "{hash}" }
+                button {
+                    class: "copy-hash-btn",
+                    title: "Copy full hash",
+                    onclick: move |_| {
+                        // Copy to clipboard — best-effort in desktop webview
+                        let full_hash = commit.hash.clone();
+                        eval(&format!("navigator.clipboard.writeText('{full_hash}')"));
                     },
-                    Some(c) => {
-                        let mut copy_label = use_signal(|| "⎘");
+                    "⊞"
+                }
+            }
 
-                        rsx! {
-                            div { class: "panel-content",
-
-                                div { class: "info-row",
-                                    span { class: "info-label", "AUTHOR" }
-                                    span { class: "info-value", {c.author_name.clone()} }
-                                }
-
-                                div { class: "info-row",
-                                    span { class: "info-label", "EMAIL" }
-                                    span {
-                                        class: "info-value info-email",
-                                        style: format!("color: {};", c.color),
-                                        {c.author_email.clone()}
-                                    }
-                                }
-
-                                div { class: "info-row",
-                                    span { class: "info-label", "DATE" }
-                                    span { class: "info-value",
-                                        {c.timestamp.format("%Y-%m-%d %H:%M UTC").to_string()}
-                                    }
-                                }
-
-                                div { class: "info-row",
-                                    span { class: "info-label", "HASH" }
-                                    div { class: "hash-row",
-                                        span { class: "info-value hash", {c.short_hash.clone()} }
-                                        button {
-                                            class: "copy-btn",
-                                            title: "Copy full hash",
-                                            onclick: {
-                                                let full_hash = c.hash.clone();
-                                                move |_| {
-                                                    if let Ok(mut cb) = arboard::Clipboard::new() {
-                                                        let _ = cb.set_text(full_hash.clone());
-                                                        copy_label.set("✓");
-                                                        // reset after 1.5s
-                                                        spawn(async move {
-                                                            tokio::time::sleep(
-                                                                std::time::Duration::from_millis(1500)
-                                                            ).await;
-                                                            copy_label.set("⎘");
-                                                        });
-                                                    }
-                                                }
-                                            },
-                                            {*copy_label.read()}
-                                        }
-                                    }
-                                }
-
-                                {
-                                    if !c.tags.is_empty() {
-                                        rsx! {
-                                            div { class: "info-row",
-                                                span { class: "info-label", "TAGS" }
-                                                div { class: "tag-list",
-                                                    for tag in &c.tags {
-                                                        span { class: "tag-badge", {format!("◆ {}", tag)} }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else { rsx! {} }
-                                }
-
-                                div { class: "divider" }
-
-                                div { class: "info-label", "MESSAGE" }
-                                div { class: "commit-message", {c.full_message.clone()} }
-
-                                { if c.is_head  { rsx! { div { class: "badge badge-head",  "● HEAD"        } } } else { rsx! {} } }
-                                { if c.is_merge { rsx! { div { class: "badge badge-merge", "⇄ MERGE COMMIT"} } } else { rsx! {} } }
-                            }
-                        }
+            if !tags.is_empty() {
+                div { class: "commit-field-label", "TAGS" }
+                div {
+                    class: "commit-tags-row",
+                    for tag in tags.iter() {
+                        span { class: "commit-tag", "+ {tag}" }
                     }
                 }
             }
+
+            div { class: "commit-field-label", "MESSAGE" }
+            div { class: "commit-message-box", "{commit.full_message}" }
         }
     }
 }

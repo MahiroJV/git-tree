@@ -22,7 +22,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());
 
-    //Helpers
+    // Helpers
     let mut open_local = move |path_str: String| {
         if path_str.is_empty() {
             error.set(Some("Please enter a path.".into()));
@@ -59,14 +59,10 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
         div {
             class: "home-screen",
 
-            h1 {
-                class: "ascii-header",
-                "GIT-TREE"
-            }
+            h1 { class: "ascii-header", "GIT-TREE" }
 
             p { class: "home-tagline", "VISUALIZE YOUR GIT HISTORY — TERMINAL STYLE" }
 
-            // Tab switcher
             div {
                 class: "tab-bar",
                 button {
@@ -94,7 +90,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             value: "{local_path}",
                             oninput: move |e| local_path.set(e.value()),
                         }
-
                         button {
                             class: "btn-primary",
                             onclick: move |_| {
@@ -106,7 +101,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             },
                             "📁"
                         }
-
                         button {
                             class: "btn-primary",
                             onclick: move |_| {
@@ -143,11 +137,23 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                     error.set(Some("Please enter a URL.".into()));
                                     return;
                                 }
+
+                                // Transition to loading screen immediately,
+                                // then clone on a blocking thread so UI doesn't freeze
                                 props.on_loading.call("cloning repository...".into());
-                                match loader::load_remote(&url) {
-                                    Ok(tree) => props.on_load.call(tree),
-                                    Err(e) => error.set(Some(format!("Error: {}", e))),
-                                }
+
+                                spawn(async move {
+                                    let result = tokio::task::spawn_blocking(move || {
+                                        loader::load_remote(&url)
+                                    })
+                                    .await;
+
+                                    match result {
+                                        Ok(Ok(tree)) => props.on_load.call(tree),
+                                        Ok(Err(e)) => error.set(Some(format!("Clone failed: {e}"))),
+                                        Err(e) => error.set(Some(format!("Task error: {e}"))),
+                                    }
+                                });
                             },
                             "CLONE →"
                         }
@@ -159,11 +165,10 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                 }
             }
 
-            // ── Recent repos ─────────────────────────────────────
+            // ── Recent repos ──────────────────────────────────────────────
             div { class: "recent-section",
                 p { class: "recent-title", "— RECENT REPOS —" }
 
-                // Search input for recents — only show if there are repos to filter
                 if !recent_repos.read().is_empty() {
                     div { class: "input-group recent-search-wrap",
                         span { class: "prompt", ">" }
@@ -209,7 +214,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             }
 
             div { class: "home-footer",
-                span { class: "text-muted", "git-tree v0.1 · built with Rust + Dioxus" }
+                span { class: "text-muted", "git-tree v0.2 · built with Rust + Dioxus" }
             }
         }
     }

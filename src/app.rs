@@ -1,14 +1,18 @@
-// app.rs — Root component + global state
 use crate::components::{
-    home_screen::HomeScreen, left_panel::LeftPanel, right_panel::RightPanel, settings::Settings,
-    toolbar::Toolbar, tree_canvas::TreeCanvas,
+    diff_viewer::DiffViewer,
+    home_screen::HomeScreen,
+    left_panel::LeftPanel,
+    right_panel::RightPanel,
+    settings::Settings,
+    toolbar::Toolbar,
+    tree_canvas::TreeCanvas,
 };
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use crate::theme::theme_by_name;
 use dioxus::prelude::*;
 
-const BASE_CSS: &str = include_str!("../assets/style.css");
+const BASE_CSS: &str = include_str!("../assets/css/style.css");
 
 #[derive(Clone, PartialEq)]
 pub enum Screen {
@@ -16,6 +20,7 @@ pub enum Screen {
     Loading(String),
     Tree,
     Settings,
+    Diff(Box<CommitNode>),
 }
 
 #[component]
@@ -24,8 +29,9 @@ pub fn App() -> Element {
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
     let mut theme_name = use_signal(|| "Terminal".to_string());
-    #[allow(clippy::redundant_closure)]
-    let mut search_query = use_signal(|| String::new());
+    let mut search_query = use_signal(String::new);
+    let mut left_open = use_signal(|| true);
+    let mut right_open = use_signal(|| true);
 
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
@@ -85,7 +91,11 @@ pub fn App() -> Element {
                 Screen::Tree => rsx! {
                     div {
                         class: "tree-layout",
-                        LeftPanel { commit: selected_commit.read().clone() }
+                        LeftPanel {
+                            commit: selected_commit.read().clone(),
+                            open: *left_open.read(),
+                            on_toggle: move |_| left_open.set(!left_open()),
+                        }
                         TreeCanvas {
                             tree: repo_tree.read().clone(),
                             selected_hash: selected_commit.read().as_ref().map(|c| c.hash.clone()),
@@ -93,7 +103,12 @@ pub fn App() -> Element {
                             on_select: move |commit: CommitNode| selected_commit.set(Some(commit)),
                             on_deselect: move |_| selected_commit.set(None),
                         }
-                        RightPanel { commit: selected_commit.read().clone() }
+                        RightPanel {
+                            commit: selected_commit.read().clone(),
+                            open: *right_open.read(),
+                            on_toggle: move |_| right_open.set(!right_open()),
+                            on_view_diff: move |commit: CommitNode| screen.set(Screen::Diff(Box::new(commit))),
+                        }
                     }
                 },
 
@@ -101,6 +116,13 @@ pub fn App() -> Element {
                     Settings {
                         current_theme: theme_name.read().clone(),
                         on_theme_change: move |name: String| theme_name.set(name),
+                        on_back: move |_| screen.set(Screen::Tree),
+                    }
+                },
+
+                Screen::Diff(commit) => rsx! {
+                    DiffViewer {
+                        commit: *commit.clone(),
                         on_back: move |_| screen.set(Screen::Tree),
                     }
                 },

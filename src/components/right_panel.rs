@@ -1,71 +1,161 @@
-// components/right_panel.rs — Diff stats panel
-use crate::git::parser::CommitNode;
+use crate::git::parser::{ChangeStatus, CommitNode};
 use dioxus::prelude::*;
 
+const PANEL_SHARED_CSS: &str = include_str!("../../assets/css/panel_shared.css");
+const RIGHT_PANEL_CSS: &str = include_str!("../../assets/css/right_panel.css");
+
 #[component]
-pub fn RightPanel(commit: Option<CommitNode>) -> Element {
+pub fn RightPanel(
+    commit: Option<CommitNode>,
+    open: bool,
+    on_toggle: EventHandler<()>,
+    on_view_diff: EventHandler<CommitNode>,
+) -> Element {
+    // ── Collapsed state — thin strip ──────────────────────────────────────
+    if !open {
+        return rsx! {
+            style { "{PANEL_SHARED_CSS}" }
+            style { "{RIGHT_PANEL_CSS}" }
+            div {
+                class: "right-panel--collapsed",
+                button {
+                    class: "panel-collapse-btn",
+                    title: "Expand diff stats",
+                    onclick: move |_| on_toggle.call(()),
+                    "◀"
+                }
+                span { class: "panel-collapsed-label", "DIFF STATS" }
+            }
+        };
+    }
+
+    // ── Expanded — empty state ─────────────────────────────────────────────
+    let Some(commit) = commit else {
+        return rsx! {
+            style { "{PANEL_SHARED_CSS}" }
+            style { "{RIGHT_PANEL_CSS}" }
+            div {
+                class: "panel right-panel",
+                div {
+                    class: "panel-header",
+                    span { "// DIFF STATS" }
+                    button {
+                        class: "panel-collapse-btn panel-collapse-btn--header",
+                        title: "Collapse",
+                        onclick: move |_| on_toggle.call(()),
+                        "▶"
+                    }
+                }
+                div { class: "panel-empty", "// select a commit" }
+            }
+        };
+    };
+
+    let total_adds: usize = commit.files_changed.iter().map(|f| f.additions).sum();
+    let total_dels: usize = commit.files_changed.iter().map(|f| f.deletions).sum();
+    let file_count = commit.files_changed.len();
+    let ratio_pct = if total_adds + total_dels > 0 {
+        (total_adds as f64 / (total_adds + total_dels) as f64 * 100.0) as u32
+    } else {
+        50
+    };
+    let commit_for_btn = commit.clone();
+
     rsx! {
-        aside {
-            class: "panel panel-right",
+        style { "{PANEL_SHARED_CSS}" }
+        style { "{RIGHT_PANEL_CSS}" }
+        div {
+            class: "panel right-panel",
 
-            div { class: "panel-header", "// DIFF STATS" }
-
-            if commit.is_none() {
-                div { class: "panel-empty",
-                    p { class: "text-muted", ">" }
-                    p { class: "text-muted", "> SELECT A NODE" }
-                    p { class: "text-muted", "> TO VIEW DIFF" }
-                    p { class: "text-muted", ">" }
+            div {
+                class: "panel-header",
+                span { "// DIFF STATS" }
+                button {
+                    class: "panel-collapse-btn panel-collapse-btn--header",
+                    title: "Collapse",
+                    onclick: move |_| on_toggle.call(()),
+                    "▶"
                 }
             }
 
-            if let Some(c) = &commit {
-                div { class: "panel-content",
+            div {
+                class: "diff-summary",
+                div {
+                    class: "diff-summary-row",
+                    span { class: "diff-label", "FILES" }
+                    span { class: "diff-value", "{file_count}" }
+                }
+                div {
+                    class: "diff-summary-row",
+                    span { class: "diff-label diff-plus", "+" }
+                    span { class: "diff-value diff-plus", "{total_adds} added" }
+                }
+                div {
+                    class: "diff-summary-row",
+                    span { class: "diff-label diff-minus", "-" }
+                    span { class: "diff-value diff-minus", "{total_dels} removed" }
+                }
+            }
 
-                    div { class: "stat-row",
-                        span { class: "stat-label", "FILES" }
-                        span { class: "stat-value", "{c.stats.files_changed}" }
+            div {
+                class: "diff-ratio-wrap",
+                span { class: "diff-ratio-label", "CHANGE RATIO" }
+                div {
+                    class: "diff-ratio-bar",
+                    div {
+                        class: "diff-ratio-fill",
+                        style: "width: {ratio_pct}%",
                     }
-                    div { class: "stat-row",
-                        span { class: "stat-label", "+" }
-                        span { class: "stat-value success", "{c.stats.insertions} added" }
-                    }
-                    div { class: "stat-row",
-                        span { class: "stat-label", "-" }
-                        span { class: "stat-value danger", "{c.stats.deletions} removed" }
-                    }
+                }
+            }
 
-                    div { class: "divider" }
+            div { class: "diff-files-header", "FILES CHANGED" }
 
-                    div { class: "diff-bar-label", "CHANGE RATIO" }
-                    {
-                        let total = (c.stats.insertions + c.stats.deletions).max(1);
-                        let add_pct = (c.stats.insertions * 100) / total;
-                        let del_pct = 100 - add_pct;
-                        rsx! {
-                            div { class: "diff-bar",
-                                div { class: "diff-bar-add", style: "width: {add_pct}%;" }
-                                div { class: "diff-bar-del", style: "width: {del_pct}%;" }
-                            }
+            div {
+                class: "diff-files-list",
+                for file in commit.files_changed.iter() {
+                    div {
+                        class: "diff-file-row",
+                        key: "{file.path}",
+                        span {
+                            class: "diff-file-status diff-file-status--{status_class(&file.status)}",
+                            "{status_label(&file.status)}"
+                        }
+                        span {
+                            class: "diff-file-path",
+                            title: "{file.path}",
+                            "{file.path}"
                         }
                     }
+                }
+            }
 
-                    div { class: "divider" }
-
-                    div { class: "info-label", "FILES CHANGED" }
-
-                    if c.files_changed.is_empty() {
-                        p { class: "text-muted", "─ full file list in v0.2 ─" }
-                    }
-
-                    for file in &c.files_changed {
-                        div { class: "file-row",
-                            span { class: "file-status", "{file.status:?}" }
-                            span { class: "file-path", "{file.path}" }
-                        }
-                    }
+            div {
+                class: "diff-btn-wrap",
+                button {
+                    class: "diff-view-btn",
+                    onclick: move |_| on_view_diff.call(commit_for_btn.clone()),
+                    "[ VIEW DIFF ]"
                 }
             }
         }
+    }
+}
+
+fn status_label(s: &ChangeStatus) -> &'static str {
+    match s {
+        ChangeStatus::Added    => "Added",
+        ChangeStatus::Modified => "Modified",
+        ChangeStatus::Deleted  => "Deleted",
+        ChangeStatus::Renamed  => "Renamed",
+    }
+}
+
+fn status_class(s: &ChangeStatus) -> &'static str {
+    match s {
+        ChangeStatus::Added    => "added",
+        ChangeStatus::Modified => "modified",
+        ChangeStatus::Deleted  => "deleted",
+        ChangeStatus::Renamed  => "renamed",
     }
 }

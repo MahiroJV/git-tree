@@ -1,7 +1,7 @@
 # 🚧 This project is currently under development 🚧
 
 <div align="center">
- <img src="assets/icon.svg" height="256" alt="gittree logo">
+ <img src="assets/icon/icon.svg" height="256" alt="gittree logo">
  <h1 align="center" style="border:0;">git-tree </h1>
 </div>
 
