@@ -1,4 +1,3 @@
-// components/home_screen.rs — Landing screen
 use crate::git::loader;
 use crate::git::parser::RepoTree;
 use crate::recent;
@@ -8,24 +7,28 @@ use rfd::FileDialog;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {
+    pub initial_error: Option<String>,
     pub on_load: EventHandler<RepoTree>,
     pub on_loading: EventHandler<String>,
+    pub on_error: EventHandler<String>,
 }
 
 #[component]
 pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut local_path = use_signal(String::new);
     let mut remote_url = use_signal(String::new);
-    let mut error = use_signal(|| Option::<String>::None);
+    let mut local_error = use_signal(|| Option::<String>::None);
     let mut tab = use_signal(|| "local");
     let mut recent_search = use_signal(String::new);
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());
 
-    // Helpers
+    // Show either a local error (bad path) or one passed down from app (failed clone)
+    let displayed_error = local_error.read().clone().or(props.initial_error.clone());
+
     let mut open_local = move |path_str: String| {
         if path_str.is_empty() {
-            error.set(Some("Please enter a path.".into()));
+            local_error.set(Some("Please enter a path.".into()));
             return;
         }
         props.on_loading.call("reading commits...".into());
@@ -36,11 +39,10 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                 recent_repos.set(recent::load_recent());
                 props.on_load.call(tree);
             }
-            Err(e) => error.set(Some(format!("Error: {e}"))),
+            Err(e) => local_error.set(Some(format!("Error: {e}"))),
         }
     };
 
-    // Filtered recent repos — live as user types
     let filtered_recents = use_memo(move || {
         let q = recent_search.read().to_lowercase();
         recent_repos
@@ -60,7 +62,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             class: "home-screen",
 
             h1 { class: "ascii-header", "GIT-TREE" }
-
             p { class: "home-tagline", "VISUALIZE YOUR GIT HISTORY — TERMINAL STYLE" }
 
             div {
@@ -106,14 +107,15 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             onclick: move |_| {
                                 let path_str = local_path.read().clone();
                                 if path_str.is_empty() {
-                                    error.set(Some("Please enter a path.".into()));
+                                    local_error.set(Some("Please enter a path.".into()));
                                     return;
                                 }
+                                local_error.set(None);
                                 props.on_loading.call("reading commits...".into());
                                 let path = std::path::PathBuf::from(&path_str);
                                 match loader::load_local(&path) {
                                     Ok(tree) => props.on_load.call(tree),
-                                    Err(e) => error.set(Some(format!("Error: {}", e))),
+                                    Err(e) => local_error.set(Some(format!("Error: {}", e))),
                                 }
                             },
                             "OPEN →"
@@ -134,12 +136,12 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             onclick: move |_| {
                                 let url = remote_url.read().clone();
                                 if url.is_empty() {
-                                    error.set(Some("Please enter a URL.".into()));
+                                    local_error.set(Some("Please enter a URL.".into()));
                                     return;
                                 }
+                                local_error.set(None);
 
-                                // Transition to loading screen immediately,
-                                // then clone on a blocking thread so UI doesn't freeze
+                                // Trigger loading screen first — then clone on bg thread
                                 props.on_loading.call("cloning repository...".into());
 
                                 spawn(async move {
@@ -150,8 +152,9 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
 
                                     match result {
                                         Ok(Ok(tree)) => props.on_load.call(tree),
-                                        Ok(Err(e)) => error.set(Some(format!("Clone failed: {e}"))),
-                                        Err(e) => error.set(Some(format!("Task error: {e}"))),
+                                        // on_error sends us back to Home and sets the error signal in app.rs
+                                        Ok(Err(e))  => props.on_error.call(format!("Clone failed: {e}")),
+                                        Err(e)      => props.on_error.call(format!("Task error: {e}")),
                                     }
                                 });
                             },
@@ -160,7 +163,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     }
                 }
 
-                if let Some(err) = error.read().as_ref() {
+                if let Some(err) = &displayed_error {
                     p { class: "error-msg", "! {err}" }
                 }
             }

@@ -35,7 +35,7 @@ pub fn RightPanel(
             style { "{PANEL_SHARED_CSS}" }
             style { "{RIGHT_PANEL_CSS}" }
             div {
-                class: "panel right-panel",
+                class: "panel right-panel collapsed",
                 div {
                     class: "panel-header",
                     span { "// DIFF STATS" }

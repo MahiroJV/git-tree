@@ -8,7 +8,7 @@
 
 > Terminal-style git branch visualizer — built with Rust + Dioxus
 
-![version](https://img.shields.io/badge/version-0.1.0-9B5DE5?style=flat-square)
+![version](https://img.shields.io/badge/version-0.2.0-9B5DE5?style=flat-square)
 ![rust](https://img.shields.io/badge/rust-1.75+-orange?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-linux-blue?style=flat-square)
 ![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
@@ -164,12 +164,12 @@ dx build --platform desktop --release
 ---
 
 ### 🧪 v0.2 — Usability
-- [ ] Search by author / message / hash
-- [ ] Diff viewer (actual +/- code lines)
-- [ ] Keyboard navigation (arrow keys between commits)
-- [ ] Fix font loading (Oxanium offline)
-- [ ] Recent repositories list
-- [ ] Copy hash button
+- [x] Search by author / message / hash
+- [x] Diff viewer (actual +/- code lines)
+- [x] Keyboard navigation (arrow keys between commits)
+- [x] Fix font loading (Oxanium offline)
+- [x] Recent repositories list
+- [x] Copy hash button
 
 ---
 

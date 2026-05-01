@@ -27,6 +27,8 @@ pub fn App() -> Element {
     let mut search_query = use_signal(String::new);
     let mut left_open = use_signal(|| true);
     let mut right_open = use_signal(|| true);
+    // Error lives in app — survives screen transitions so clone errors can show
+    let mut clone_error = use_signal(|| Option::<String>::None);
 
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
@@ -63,14 +65,21 @@ pub fn App() -> Element {
             match screen.read().clone() {
                 Screen::Home => rsx! {
                     HomeScreen {
+                        initial_error: clone_error.read().clone(),
                         on_load: move |tree: RepoTree| {
+                            clone_error.set(None);
                             repo_tree.set(Some(tree));
                             selected_commit.set(None);
                             search_query.set(String::new());
                             screen.set(Screen::Tree);
                         },
                         on_loading: move |msg: String| {
+                            clone_error.set(None);
                             screen.set(Screen::Loading(msg));
+                        },
+                        on_error: move |err: String| {
+                            clone_error.set(Some(err));
+                            screen.set(Screen::Home);
                         },
                     }
                 },

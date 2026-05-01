@@ -119,15 +119,6 @@ html, body, #main {
     min-height: 0;
     overflow: hidden;
 }
-/* LEFT collapse */
-.tree-layout.left-collapsed {
-    grid-template-columns: 28px 1fr var(--panel-width);
-}
-
-/* RIGHT collapse */
-.tree-layout.right-collapsed {
-    grid-template-columns: var(--panel-width) 1fr 28px;
-}
 /* ── Panels ── */
 .panel {
     display: flex;
@@ -138,7 +129,15 @@ html, body, #main {
     min-width: 0;
 }
 .panel-left  { border-right: 1px solid var(--border); }
-.panel-right { border-left:  1px solid var(--border); }
+.panel-right {
+    width: var(--panel-width);
+    position: relative;
+    transition: transform 0.3s ease;
+}
+
+.panel-right.collapsed {
+    transform: translateX(calc(100% - 28px));
+}
 
 .panel-header {
     padding: 10px 14px;
