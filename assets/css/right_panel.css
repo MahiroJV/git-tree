@@ -14,6 +14,11 @@
     gap: 10px;
     border-left: 1px solid var(--border);
     overflow: hidden;
+    /* Push the 28 px strip to the RIGHT edge of its grid cell so it doesn't
+       float left when the column is still at var(--panel-width). The dynamic
+       grid-template-columns in app.rs already shrinks the column to 28 px on
+       collapse, so this is a belt-and-suspenders safety net. */
+    margin-left: auto;
 }
 
 .right-panel--empty {

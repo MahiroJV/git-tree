@@ -20,6 +20,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut local_error = use_signal(|| Option::<String>::None);
     let mut tab = use_signal(|| "local");
     let mut recent_search = use_signal(String::new);
+    let mut is_cloning = use_signal(|| false);
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());
 
@@ -122,6 +123,13 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         }
                     }
                 } else {
+                    // ── Remote clone ──────────────────────────────────────────────
+                    // NOTE: We intentionally do NOT switch to Screen::Loading here.
+                    // Switching screens unmounts this component, which invalidates the
+                    // EventHandler closures captured by the spawn task — the callbacks
+                    // would silently fire into the void. Instead we show inline loading
+                    // state and keep this component mounted for the full duration of the
+                    // clone, then call on_load / set local error when done.
                     div { class: "input-group",
                         span { class: "prompt", "> URL:" }
                         input {
@@ -129,10 +137,12 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             r#type: "text",
                             placeholder: "https://github.com/user/repo",
                             value: "{remote_url}",
+                            disabled: *is_cloning.read(),
                             oninput: move |e| remote_url.set(e.value()),
                         }
                         button {
                             class: "btn-primary",
+                            disabled: *is_cloning.read(),
                             onclick: move |_| {
                                 let url = remote_url.read().clone();
                                 if url.is_empty() {
@@ -140,25 +150,46 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                     return;
                                 }
                                 local_error.set(None);
+                                is_cloning.set(true);
 
-                                // Trigger loading screen first — then clone on bg thread
-                                props.on_loading.call("cloning repository...".into());
-
+                                // Spawn the clone on a real OS thread (libgit2 is blocking
+                                // and can hang tokio's thread-pool on some systems). We pair
+                                // it with a oneshot channel so the Dioxus async runtime can
+                                // await completion without blocking the UI thread.
                                 spawn(async move {
-                                    let result = tokio::task::spawn_blocking(move || {
-                                        loader::load_remote(&url)
-                                    })
-                                    .await;
+                                    let (tx, rx) = tokio::sync::oneshot::channel();
+                                    std::thread::spawn(move || {
+                                        let result = loader::load_remote(&url);
+                                        let _ = tx.send(result);
+                                    });
 
-                                    match result {
-                                        Ok(Ok(tree)) => props.on_load.call(tree),
-                                        // on_error sends us back to Home and sets the error signal in app.rs
-                                        Ok(Err(e))  => props.on_error.call(format!("Clone failed: {e}")),
-                                        Err(e)      => props.on_error.call(format!("Task error: {e}")),
+                                    match rx.await {
+                                        Ok(Ok(tree)) => {
+                                            is_cloning.set(false);
+                                            props.on_load.call(tree);
+                                        }
+                                        Ok(Err(e)) => {
+                                            is_cloning.set(false);
+                                            local_error.set(Some(format!("Clone failed: {e}")));
+                                        }
+                                        Err(_) => {
+                                            is_cloning.set(false);
+                                            local_error.set(Some("Clone task panicked".into()));
+                                        }
                                     }
                                 });
                             },
-                            "CLONE →"
+                            if *is_cloning.read() { "CLONING..." } else { "CLONE →" }
+                        }
+                    }
+
+                    // Inline loading indicator — visible while clone is in progress
+                    if *is_cloning.read() {
+                        div {
+                            class: "loading-cursor",
+                            style: "font-size: 11px; letter-spacing: 0.1em; margin-top: 4px;",
+                            "> cloning repository "
+                            span { class: "loading-blink", style: "font-size: 13px;", "█" }
                         }
                     }
                 }

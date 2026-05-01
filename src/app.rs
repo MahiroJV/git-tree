@@ -93,25 +93,34 @@ pub fn App() -> Element {
                 },
 
                 Screen::Tree => rsx! {
-                    div {
-                        class: "tree-layout",
-                        LeftPanel {
-                            commit: selected_commit.read().clone(),
-                            open: *left_open.read(),
-                            on_toggle: move |_| left_open.set(!left_open()),
-                        }
-                        TreeCanvas {
-                            tree: repo_tree.read().clone(),
-                            selected_hash: selected_commit.read().as_ref().map(|c| c.hash.clone()),
-                            search_query: search_query.read().clone(),
-                            on_select: move |commit: CommitNode| selected_commit.set(Some(commit)),
-                            on_deselect: move |_| selected_commit.set(None),
-                        }
-                        RightPanel {
-                            commit: selected_commit.read().clone(),
-                            open: *right_open.read(),
-                            on_toggle: move |_| right_open.set(!right_open()),
-                            on_view_diff: move |commit: CommitNode| screen.set(Screen::Diff(Box::new(commit))),
+                    {
+                        // Columns shrink to 28 px when a panel is collapsed so the
+                        // canvas takes the reclaimed space instead of leaving a gap.
+                        let lw = if *left_open.read() { "var(--panel-width)" } else { "28px" };
+                        let rw = if *right_open.read() { "var(--panel-width)" } else { "28px" };
+                        rsx! {
+                            div {
+                                class: "tree-layout",
+                                style: "grid-template-columns: {lw} 1fr {rw};",
+                                LeftPanel {
+                                    commit: selected_commit.read().clone(),
+                                    open: *left_open.read(),
+                                    on_toggle: move |_| left_open.set(!left_open()),
+                                }
+                                TreeCanvas {
+                                    tree: repo_tree.read().clone(),
+                                    selected_hash: selected_commit.read().as_ref().map(|c| c.hash.clone()),
+                                    search_query: search_query.read().clone(),
+                                    on_select: move |commit: CommitNode| selected_commit.set(Some(commit)),
+                                    on_deselect: move |_| selected_commit.set(None),
+                                }
+                                RightPanel {
+                                    commit: selected_commit.read().clone(),
+                                    open: *right_open.read(),
+                                    on_toggle: move |_| right_open.set(!right_open()),
+                                    on_view_diff: move |commit: CommitNode| screen.set(Screen::Diff(Box::new(commit))),
+                                }
+                            }
                         }
                     }
                 },

@@ -1,12 +1,14 @@
 use crate::git::parser::{ChangeStatus, CommitNode};
 use dioxus::prelude::*;
+use std::collections::HashSet;
 
 const DIFF_VIEWER_CSS: &str = include_str!("../../assets/css/diff_viewer.css");
 
 #[component]
 pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
-    // Precompute everything before rsx! — Dioxus macro can't handle method calls
-    // that return non-Display types (e.g. chrono::DelayedFormat)
+    // Track which files are collapsed — stored by file path
+    let mut collapsed: Signal<HashSet<String>> = use_signal(HashSet::new);
+
     let total_adds: usize = commit.files_changed.iter().map(|f| f.additions).sum();
     let total_dels: usize = commit.files_changed.iter().map(|f| f.deletions).sum();
     let file_count = commit.files_changed.len();
@@ -17,8 +19,12 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
 
     rsx! {
         style { "{DIFF_VIEWER_CSS}" }
+
+        // Inline style is the nuclear option — guarantees WebKit honours the
+        // flex height even if the external CSS parse order fights us.
         div {
             class: "diffview-root",
+            style: "display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%;",
 
             // ── Top bar ───────────────────────────────────────────────────
             div {
@@ -43,14 +49,39 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
             // ── Stats bar ─────────────────────────────────────────────────
             div {
                 class: "diffview-statsbar",
-                span { class: "diffview-stat",          "{file_count} files" }
+                span { class: "diffview-stat", "{file_count} files" }
                 span { class: "diffview-stat diffview-stat--add", "+{total_adds}" }
                 span { class: "diffview-stat diffview-stat--del", "-{total_dels}" }
+
+                // Collapse-all / expand-all shortcuts
+                div { style: "margin-left: auto; display: flex; gap: 8px;",
+                    button {
+                        class: "diffview-fold-btn",
+                        title: "Collapse all files",
+                        onclick: move |_| {
+                            let paths: HashSet<String> = commit
+                                .files_changed
+                                .iter()
+                                .map(|f| f.path.clone())
+                                .collect();
+                            collapsed.set(paths);
+                        },
+                        "[ FOLD ALL ]"
+                    }
+                    button {
+                        class: "diffview-fold-btn",
+                        title: "Expand all files",
+                        onclick: move |_| collapsed.set(HashSet::new()),
+                        "[ EXPAND ALL ]"
+                    }
+                }
             }
 
-            // ── File diffs ────────────────────────────────────────────────
+            // ── Scrollable file list ───────────────────────────────────────
             div {
                 class: "diffview-body",
+                // Belt-and-suspenders inline scroll guarantee
+                style: "flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;",
 
                 if commit.files_changed.is_empty() {
                     div {
@@ -61,50 +92,81 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
 
                 for file in commit.files_changed.iter() {
                     {
-                        let badge_class = format!("diffview-file-badge diffview-file-badge--{}", status_class(&file.status));
-                        let status_text = status_label(&file.status);
                         let path = file.path.clone();
+                        let path_key = path.clone();
+                        let path_toggle = path.clone();
+                        let badge_class = format!(
+                            "diffview-file-badge diffview-file-badge--{}",
+                            status_class(&file.status)
+                        );
+                        let status_text = status_label(&file.status);
                         let adds = file.additions;
                         let dels = file.deletions;
                         let has_lines = !file.lines.is_empty();
+                        let is_collapsed = collapsed.read().contains(&path_key);
+                        let arrow = if is_collapsed { "▶" } else { "▼" };
 
                         rsx! {
                             div {
                                 class: "diffview-file",
                                 key: "{path}",
 
+                                // ── File header with collapse toggle ──────────
                                 div {
                                     class: "diffview-file-header",
+
+                                    // Collapse / expand toggle
+                                    button {
+                                        class: "diffview-collapse-btn",
+                                        title: if is_collapsed { "Expand" } else { "Collapse" },
+                                        onclick: move |_| {
+                                            let mut set = collapsed.write();
+                                            if set.contains(&path_toggle) {
+                                                set.remove(&path_toggle);
+                                            } else {
+                                                set.insert(path_toggle.clone());
+                                            }
+                                        },
+                                        "{arrow}"
+                                    }
+
                                     span { class: "{badge_class}", "{status_text}" }
                                     span { class: "diffview-file-path", "{path}" }
-                                    span { class: "diffview-file-counts",
+                                    span {
+                                        class: "diffview-file-counts",
                                         span { class: "dv-plus", "+{adds}" }
                                         " / "
                                         span { class: "dv-minus", "-{dels}" }
                                     }
                                 }
 
-                                if !has_lines {
-                                    div {
-                                        class: "diffview-no-lines",
-                                        "// binary or empty diff"
-                                    }
-                                } else {
-                                    div {
-                                        class: "diffview-hunk",
-                                        for (i, line) in file.lines.iter().enumerate() {
-                                            {
-                                                let line_class = format!("dv-line dv-line--{}", origin_class(line.origin));
-                                                let num = i + 1;
-                                                let glyph = line.origin.to_string();
-                                                let content = line.content.clone();
-                                                rsx! {
-                                                    div {
-                                                        class: "{line_class}",
-                                                        key: "{i}",
-                                                        span { class: "dv-line-num",    "{num}" }
-                                                        span { class: "dv-line-origin", "{glyph}" }
-                                                        span { class: "dv-line-text",   "{content}" }
+                                // ── Diff body — hidden when collapsed ─────────
+                                if !is_collapsed {
+                                    if !has_lines {
+                                        div {
+                                            class: "diffview-no-lines",
+                                            "// binary or empty diff"
+                                        }
+                                    } else {
+                                        div {
+                                            class: "diffview-hunk",
+                                            for (i, line) in file.lines.iter().enumerate() {
+                                                {
+                                                    let line_class = format!(
+                                                        "dv-line dv-line--{}",
+                                                        origin_class(line.origin)
+                                                    );
+                                                    let num = i + 1;
+                                                    let glyph = line.origin.to_string();
+                                                    let content = line.content.clone();
+                                                    rsx! {
+                                                        div {
+                                                            class: "{line_class}",
+                                                            key: "{i}",
+                                                            span { class: "dv-line-num",    "{num}" }
+                                                            span { class: "dv-line-origin", "{glyph}" }
+                                                            span { class: "dv-line-text",   "{content}" }
+                                                        }
                                                     }
                                                 }
                                             }
