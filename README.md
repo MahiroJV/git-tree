@@ -2,9 +2,8 @@
 
 <div align="center">
  <img src="assets/icon/icon.svg" height="256" alt="gittree logo">
- <h1 align="center" style="border:0;">git-tree </h1>
+ <h1 align="center" style="border:0;">git-tree</h1>
 </div>
-
 
 > Terminal-style git branch visualizer — built with Rust + Dioxus
 
@@ -17,7 +16,7 @@
 
 ## What is it?
 
-git-tree lets you visualize your git history in a clean terminal-style desktop app. open any local repo or clone a remote one, click any commit node to see author, date, message, and diff stats.
+git-tree lets you visualize your git history in a clean terminal-style desktop app. Open any local repo or clone a remote one, click any commit node to see author, date, message, and diff stats. Full diff viewer included.
 
 ```
  ──●──●──●──●──●──●──●──
@@ -27,14 +26,24 @@ git-tree lets you visualize your git history in a clean terminal-style desktop a
 
 ---
 
-## Features (v0.1)
+## Features (v0.2)
 
-- open local git repos or clone remote URLs
-- horizontal branch tree — branches go up and down
-- each contributor gets a unique persistent color
-- click any commit node → author, date, message, hash, diff stats
-- 9 built-in themes with live preview in settings
-- default theme: **Terminal** (black + purple, Oxanium + Space Mono fonts)
+- Open local git repos or clone remote URLs
+- Horizontal **and** vertical branch tree layouts
+- Each contributor gets a unique persistent color
+- Click any commit node → author, date, message, hash, diff stats
+- Full diff viewer with per-file collapse/expand and hunk lines
+- Search commits by author, message, or hash
+- Keyboard navigation between commits (← → or ↑ ↓)
+- Zoom + pan (CTRL+scroll, drag, or toolbar buttons)
+- Recent repositories list with search filter
+- Copy commit hash to clipboard
+- 11 built-in themes with live preview in settings
+- CRT scanline overlay (toggleable)
+- Font size control (11–16px)
+- Node spacing control (Compact / Normal / Wide)
+- Merge commit visibility toggle
+- Default theme: **Terminal** (black + purple, Space Mono font)
 
 ---
 
@@ -42,7 +51,7 @@ git-tree lets you visualize your git history in a clean terminal-style desktop a
 
 ### Linux (recommended)
 
-**1. install system dependencies**
+**1. Install system dependencies**
 
 Ubuntu / Debian:
 ```bash
@@ -68,9 +77,9 @@ Fedora:
 sudo dnf install libgit2-devel webkit2gtk4.1-devel gtk3-devel
 ```
 
-**2. download the binary**
+**2. Download the binary**
 
-grab the latest release from the [Releases page](https://github.com/MahiroJV/git-tree/releases/latest):
+Grab the latest release from the [Releases page](https://github.com/MahiroJV/git-tree/releases/latest):
 
 ```bash
 wget https://github.com/MahiroJV/git-tree/releases/latest/download/git-tree-linux
@@ -78,7 +87,7 @@ chmod +x git-tree-linux
 ./git-tree-linux
 ```
 
-or move it to your PATH for system-wide access:
+Or move it to your PATH for system-wide access:
 ```bash
 sudo mv git-tree-linux /usr/local/bin/git-tree
 git-tree
@@ -88,47 +97,55 @@ git-tree
 
 ## Build from source
 
-**requirements:**
+**Requirements:**
 - Rust 1.75+
 - Dioxus CLI
-- system dependencies (see above)
+- System dependencies (see above)
 
 ```bash
-# clone the repo
+# Clone the repo
 git clone https://github.com/MahiroJV/git-tree
 cd git-tree
 
-# install dioxus cli
+# Install Dioxus CLI
 cargo install dioxus-cli
 
-# run in dev mode
+# Run in dev mode
 dx serve --platform desktop
 
-# build release binary
+# Build release binary
 dx build --platform desktop --release
-# binary will be at: dist/git-tree
+# Binary will be at: dist/git-tree
 ```
 
 ---
 
 ## Usage
 
-**open a local repo:**
-1. launch git-tree
-2. make sure `[ LOCAL FOLDER ]` tab is selected
-3. type the full path to your repo (e.g. `/home/user/my-project`)
-4. click `OPEN →`
+**Open a local repo:**
+1. Launch git-tree
+2. Make sure `[ LOCAL FOLDER ]` tab is selected
+3. Type the full path to your repo or use the 📁 picker
+4. Click `OPEN →`
 
-**clone a remote repo:**
-1. click `[ REMOTE URL ]` tab
-2. paste a GitHub/GitLab URL (e.g. `https://github.com/user/repo`)
-3. click `CLONE →`
+**Clone a remote repo:**
+1. Click `[ REMOTE URL ]` tab
+2. Paste a GitHub/GitLab URL (e.g. `https://github.com/user/repo`)
+3. Click `CLONE →`
 4. git-tree clones it to a temp folder and opens it
 
-**navigating the tree:**
-- click any commit node → left panel shows commit info, right panel shows diff stats
-- use the toolbar to go back home, refresh, or open settings
-- settings → pick from 9 themes, preview updates live
+**Navigating the tree:**
+- Click any commit node → left panel shows commit info, right panel shows diff stats
+- `← →` (horizontal) or `↑ ↓` (vertical) to move between commits
+- `ESC` to deselect
+- `CTRL+scroll` to zoom, drag to pan
+- Toolbar → `[ VIEW DIFF ]` to open the full diff viewer
+
+**Settings:**
+- 11 themes with live preview
+- Font size, node spacing, merge commit visibility
+- Tree direction (Horizontal / Vertical)
+- CRT scanline overlay
 
 ---
 
@@ -136,15 +153,17 @@ dx build --platform desktop --release
 
 | Name | Description |
 |---|---|
-| **Terminal** | black + purple, default |
-| **Matrix** | hacker green |
-| **Amber** | old phosphor monitor |
+| **Terminal** | Black + purple — default |
+| **Matrix** | Hacker green |
+| **Amber** | Old phosphor monitor |
 | **Synthwave** | 80s retrowave |
-| **Nord** | cold Nordic blues |
-| **Dracula** | popular dark dev theme |
-| **Gruvbox** | warm retro |
-| **Blood Moon** | dark dramatic red |
-| **Ice Terminal** | cold blue cyberpunk |
+| **Nord** | Cold Nordic blues |
+| **Dracula** | Popular dark dev theme |
+| **Gruvbox** | Warm retro |
+| **Blood Moon** | Dark dramatic red |
+| **Ice Terminal** | Cold blue cyberpunk |
+| **Light** | Paper white, clean |
+| **Dark** | Deeper black than Terminal |
 
 ---
 
@@ -152,7 +171,7 @@ dx build --platform desktop --release
 
 ---
 
-### 🧱 v0.1 — Foundation
+### 🧱 v0.1 — Foundation ✅
 - [x] Tree visualization
 - [x] Click panels (commit info + diff stats)
 - [x] 9 themes
@@ -163,23 +182,27 @@ dx build --platform desktop --release
 
 ---
 
-### 🧪 v0.2 — Usability
+### 🧪 v0.2 — Usability ✅
 - [x] Search by author / message / hash
-- [x] Diff viewer (actual +/- code lines)
+- [x] Diff viewer (actual +/- code lines with collapse)
 - [x] Keyboard navigation (arrow keys between commits)
-- [x] Fix font loading (Oxanium offline)
-- [x] Recent repositories list
+- [x] Fix font loading (Space Mono offline)
+- [x] Recent repositories list with filter
 - [x] Copy hash button
+- [x] Vertical tree layout
+- [x] Settings panel (font size, node spacing, merge visibility)
+- [x] CRT scanline overlay
+- [x] 2 extra themes (Light, Dark)
 
 ---
 
 ### 🎨 v0.3 — Polish
-- [ ] Minimap (corner overview)
-- [ ] Repo stats (leaderboard + heatmap)
-- [ ] Export (SVG / PNG)
-- [ ] CRT scanline overlay (toggleable)
+- [ ] Minimap (corner overview of the full tree)
+- [ ] Repo stats (contributor leaderboard + commit heatmap)
+- [ ] Export tree as SVG or PNG
 - [ ] Open commit in browser (GitHub / GitLab)
 - [ ] Node pulse animation on click
+- [ ] Blame view (per-file line authorship)
 
 ---
 
@@ -195,28 +218,40 @@ dx build --platform desktop --release
 - [ ] Android port (Dioxus mobile)
 - [ ] Full keyboard shortcut system
 - [ ] Performance improvements (lazy loading for huge repos)
-- [ ] Settings panel (font size, animations toggle)
 - [ ] Community themes
+
+---
+
 ## Project Structure
 
 ```
 src/
-├── main.rs                 # entry point, window config
-├── app.rs                  # root component + global state
-├── theme.rs                # 9 themes + contributor color engine
+├── main.rs                 # Entry point, window config
+├── app.rs                  # Root component + global state
+├── theme.rs                # 11 themes + contributor color engine
+├── recent.rs               # Recent repos persistence (~/.config/git-tree/)
 ├── components/
-│   ├── home_screen.rs      # repo open/clone screen
-│   ├── toolbar.rs          # top navigation
-│   ├── tree_canvas.rs      # SVG tree visualization
-│   ├── left_panel.rs       # commit details
-│   ├── right_panel.rs      # diff stats
-│   └── settings.rs         # theme selector
+│   ├── home_screen.rs      # Repo open/clone screen + recent list
+│   ├── toolbar.rs          # Top navigation + search bar
+│   ├── tree_canvas.rs      # SVG tree (horizontal + vertical layouts)
+│   ├── left_panel.rs       # Commit details + copy hash
+│   ├── right_panel.rs      # Diff stats + file list
+│   ├── diff_viewer.rs      # Full diff viewer with per-file collapse
+│   └── settings.rs         # Theme selector + display options
 └── git/
-    ├── loader.rs           # open local / clone remote
-    └── parser.rs           # git history → tree data structures
+    ├── loader.rs           # Open local / clone remote
+    └── parser.rs           # Git history → tree data structures
 
 assets/
-└── style.css               # terminal theme styling
+├── css/
+│   ├── style.css           # Core terminal theme + layout
+│   ├── diff_viewer.css     # Diff viewer styles
+│   ├── left_panel.css      # Left panel styles
+│   ├── right_panel.css     # Right panel styles
+│   └── panel_shared.css    # Shared collapse/expand styles
+└── fonts/
+    ├── Oxanium.ttf
+    └── SpaceMono-Regular.woff2
 ```
 
 ---
@@ -237,7 +272,7 @@ assets/
 
 **MahiroJV** — [github.com/MahiroJV](https://github.com/MahiroJV)
 
-built with Rust + Dioxus 🦀
+Built with Rust + Dioxus 🦀
 
 ---
 
