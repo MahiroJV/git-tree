@@ -128,6 +128,30 @@ pub const THEMES: &[Theme] = &[
         success: "#00FF85",
         danger: "#FF2244",
     },
+    // Clean light — paper white
+    Theme {
+        name: "Light",
+        bg: "#F5F5F5",
+        bg_secondary: "#EBEBEB",
+        text: "#1A1A1A",
+        text_muted: "#888888",
+        accent: "#7C3AED",
+        border: "#C4B5FD",
+        success: "#16A34A",
+        danger: "#DC2626",
+    },
+    // Pure dark — deeper than Terminal
+    Theme {
+        name: "Dark",
+        bg: "#0A0A0A",
+        bg_secondary: "#111111",
+        text: "#E8E8E8",
+        text_muted: "#444444",
+        accent: "#A78BFA",
+        border: "#2D2D2D",
+        success: "#34D399",
+        danger: "#F87171",
+    },
 ];
 #[allow(dead_code)]
 pub fn default_theme() -> &'static Theme {

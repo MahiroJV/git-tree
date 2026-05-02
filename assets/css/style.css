@@ -51,6 +51,7 @@ html, body, #main {
     font-size: 13px;
     letter-spacing: 0;
     overflow: hidden;
+    font-size: var(--font-size, 13px);
 }
 
 /* ── Toolbar ── */
@@ -604,3 +605,106 @@ html, body, #main {
     max-width: 580px;
     width: 100%;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   APPEND THIS TO THE BOTTOM OF assets/css/style.css
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── CRT scanline overlay ── */
+.crt-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+            to bottom,
+            transparent 0px,
+            transparent 3px,
+            rgba(0, 0, 0, 0.18) 3px,
+            rgba(0, 0, 0, 0.18) 4px
+    );
+    animation: crt-flicker 8s infinite;
+}
+
+@keyframes crt-flicker {
+    0%, 97%, 100% { opacity: 1; }
+    98%            { opacity: 0.85; }
+    99%            { opacity: 1; }
+}
+
+/* ── Settings rows ── */
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(155, 93, 229, 0.12);
+}
+.setting-row:last-child { border-bottom: none; }
+
+.setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.setting-label-title {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text);
+    text-transform: uppercase;
+}
+
+.setting-label-value {
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+}
+
+.setting-options {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Option button — inactive */
+.option-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 5px 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+.option-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Option button — active/selected */
+.option-btn--active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+}
+.option-btn--active:hover {
+    background: var(--accent);
+    color: var(--bg);
+    opacity: 0.85;
+}
+
+/* ── Font size propagation ── */
+/* Any element that should respect the user's font-size setting */
+/*.panel,*/
+.commit-field-value,
+.commit-message-box,
+.diff-file-path,
+.diff-file-row,
+.recent-item-path

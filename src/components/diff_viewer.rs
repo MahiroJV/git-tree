@@ -6,7 +6,6 @@ const DIFF_VIEWER_CSS: &str = include_str!("../../assets/css/diff_viewer.css");
 
 #[component]
 pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
-    // Track which files are collapsed — stored by file path
     let mut collapsed: Signal<HashSet<String>> = use_signal(HashSet::new);
 
     let total_adds: usize = commit.files_changed.iter().map(|f| f.additions).sum();
@@ -20,11 +19,8 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
     rsx! {
         style { "{DIFF_VIEWER_CSS}" }
 
-        // Inline style is the nuclear option — guarantees WebKit honours the
-        // flex height even if the external CSS parse order fights us.
         div {
             class: "diffview-root",
-            style: "display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%;",
 
             // ── Top bar ───────────────────────────────────────────────────
             div {
@@ -49,15 +45,13 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
             // ── Stats bar ─────────────────────────────────────────────────
             div {
                 class: "diffview-statsbar",
-                span { class: "diffview-stat", "{file_count} files" }
+                span { class: "diffview-stat",              "{file_count} files" }
                 span { class: "diffview-stat diffview-stat--add", "+{total_adds}" }
                 span { class: "diffview-stat diffview-stat--del", "-{total_dels}" }
 
-                // Collapse-all / expand-all shortcuts
                 div { style: "margin-left: auto; display: flex; gap: 8px;",
                     button {
                         class: "diffview-fold-btn",
-                        title: "Collapse all files",
                         onclick: move |_| {
                             let paths: HashSet<String> = commit
                                 .files_changed
@@ -70,7 +64,6 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
                     }
                     button {
                         class: "diffview-fold-btn",
-                        title: "Expand all files",
                         onclick: move |_| collapsed.set(HashSet::new()),
                         "[ EXPAND ALL ]"
                     }
@@ -80,30 +73,24 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
             // ── Scrollable file list ───────────────────────────────────────
             div {
                 class: "diffview-body",
-                // Belt-and-suspenders inline scroll guarantee
-                style: "flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;",
 
                 if commit.files_changed.is_empty() {
-                    div {
-                        class: "diffview-empty",
-                        "// no file changes recorded"
-                    }
+                    div { class: "diffview-empty", "// no file changes recorded" }
                 }
 
                 for file in commit.files_changed.iter() {
                     {
-                        let path = file.path.clone();
-                        let path_key = path.clone();
+                        let path        = file.path.clone();
                         let path_toggle = path.clone();
                         let badge_class = format!(
                             "diffview-file-badge diffview-file-badge--{}",
                             status_class(&file.status)
                         );
                         let status_text = status_label(&file.status);
-                        let adds = file.additions;
-                        let dels = file.deletions;
-                        let has_lines = !file.lines.is_empty();
-                        let is_collapsed = collapsed.read().contains(&path_key);
+                        let adds        = file.additions;
+                        let dels        = file.deletions;
+                        let has_lines   = !file.lines.is_empty();
+                        let is_collapsed = collapsed.read().contains(&path);
                         let arrow = if is_collapsed { "▶" } else { "▼" };
 
                         rsx! {
@@ -111,11 +98,9 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
                                 class: "diffview-file",
                                 key: "{path}",
 
-                                // ── File header with collapse toggle ──────────
+                                // ── File header ───────────────────────────
                                 div {
                                     class: "diffview-file-header",
-
-                                    // Collapse / expand toggle
                                     button {
                                         class: "diffview-collapse-btn",
                                         title: if is_collapsed { "Expand" } else { "Collapse" },
@@ -129,18 +114,17 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
                                         },
                                         "{arrow}"
                                     }
-
                                     span { class: "{badge_class}", "{status_text}" }
                                     span { class: "diffview-file-path", "{path}" }
                                     span {
                                         class: "diffview-file-counts",
-                                        span { class: "dv-plus", "+{adds}" }
+                                        span { class: "dv-plus",  "+{adds}" }
                                         " / "
                                         span { class: "dv-minus", "-{dels}" }
                                     }
                                 }
 
-                                // ── Diff body — hidden when collapsed ─────────
+                                // ── Diff lines — hidden when collapsed ────
                                 if !is_collapsed {
                                     if !has_lines {
                                         div {
@@ -156,8 +140,8 @@ pub fn DiffViewer(commit: CommitNode, on_back: EventHandler<()>) -> Element {
                                                         "dv-line dv-line--{}",
                                                         origin_class(line.origin)
                                                     );
-                                                    let num = i + 1;
-                                                    let glyph = line.origin.to_string();
+                                                    let num     = i + 1;
+                                                    let glyph   = line.origin.to_string();
                                                     let content = line.content.clone();
                                                     rsx! {
                                                         div {
