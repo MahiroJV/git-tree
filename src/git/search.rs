@@ -65,7 +65,10 @@ pub async fn search_github(query: &str, limit: u8) -> Result<Vec<SearchResult>> 
         anyhow::bail!("Github API error {status}: {body}");
     }
 
-    let data: ApiResponse = resp.json().await.context("Failed to parse GitHub response")?;
+    let data: ApiResponse = resp
+        .json()
+        .await
+        .context("Failed to parse GitHub response")?;
     Ok(data.items)
 }
 

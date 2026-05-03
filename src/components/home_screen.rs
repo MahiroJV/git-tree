@@ -9,26 +9,29 @@ use rfd::FileDialog;
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {
     pub initial_error: Option<String>,
-    pub on_load:       EventHandler<RepoTree>,
-    pub on_loading:    EventHandler<String>,
-    pub on_error:      EventHandler<String>,
+    pub on_load: EventHandler<RepoTree>,
+    pub on_loading: EventHandler<String>,
+    pub on_error: EventHandler<String>,
 }
 
 #[component]
 pub fn HomeScreen(props: HomeScreenProps) -> Element {
-    let mut local_path    = use_signal(String::new);
-    let mut remote_url    = use_signal(String::new);
-    let mut local_error   = use_signal(|| Option::<String>::None);
-    let mut tab           = use_signal(|| "local");
+    let mut local_path = use_signal(String::new);
+    let mut remote_url = use_signal(String::new);
+    let mut local_error = use_signal(|| Option::<String>::None);
+    let mut tab = use_signal(|| "local");
     let mut recent_search = use_signal(String::new);
-    let mut is_cloning    = use_signal(|| false);
+    let mut is_cloning = use_signal(|| false);
 
     // ── Search state ──────────────────────────────────────────────────────────
-    let mut search_input   = use_signal(String::new);
+    let mut search_input = use_signal(String::new);
+
+    #[allow(clippy::redundant_closure)]
     let mut search_results = use_signal(|| Vec::<SearchResult>::new());
-    let mut is_searching   = use_signal(|| false);
-    let mut search_error   = use_signal(|| Option::<String>::None);
-    let mut cloning_url    = use_signal(|| Option::<String>::None); // which result is cloning
+
+    let mut is_searching = use_signal(|| false);
+    let mut search_error = use_signal(|| Option::<String>::None);
+    let mut cloning_url = use_signal(|| Option::<String>::None); // which result is cloning
 
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());

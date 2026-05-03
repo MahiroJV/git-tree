@@ -8,15 +8,15 @@ use dioxus::prelude::*;
 const NODE_RADIUS: f64 = 10.0;
 
 // Horizontal mode
-const H_CANVAS_HEIGHT: f64  = 500.0;
-const H_V_MAIN: f64         = 250.0;
-const H_V_BRANCH_UP: f64    = 130.0;  // 120 px above main
-const H_V_BRANCH_DOWN: f64  = 370.0;  // 120 px below main
+const H_CANVAS_HEIGHT: f64 = 500.0;
+const H_V_MAIN: f64 = 250.0;
+const H_V_BRANCH_UP: f64 = 130.0; // 120 px above main
+const H_V_BRANCH_DOWN: f64 = 370.0; // 120 px below main
 
 // Vertical mode
-const V_CANVAS_WIDTH: f64   = 600.0;
-const V_H_MAIN: f64         = 300.0;
-const V_H_BRANCH_LEFT: f64  = 175.0;
+const V_CANVAS_WIDTH: f64 = 600.0;
+const V_H_MAIN: f64 = 300.0;
+const V_H_BRANCH_LEFT: f64 = 175.0;
 const V_H_BRANCH_RIGHT: f64 = 425.0;
 
 /// Half-width (px) of the flat-top segment in Geometric mode.
@@ -78,7 +78,7 @@ fn geo_h_approach(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
         return format!("M {x1} {y1} L {x2} {y2}");
     }
     let ramp = (y2 - y1).abs().min((x2 - x1).abs() * 0.80);
-    let xc   = if x2 >= x1 { x2 - ramp } else { x2 + ramp };
+    let xc = if x2 >= x1 { x2 - ramp } else { x2 + ramp };
     format!("M {x1} {y1} L {xc} {y1} L {x2} {y2}")
 }
 
@@ -88,7 +88,7 @@ fn geo_h_leave(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
         return format!("M {x1} {y1} L {x2} {y2}");
     }
     let ramp = (y2 - y1).abs().min((x2 - x1).abs() * 0.80);
-    let xc   = if x2 >= x1 { x1 + ramp } else { x1 - ramp };
+    let xc = if x2 >= x1 { x1 + ramp } else { x1 - ramp };
     format!("M {x1} {y1} L {xc} {y2} L {x2} {y2}")
 }
 
@@ -98,7 +98,7 @@ fn geo_v_approach(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
         return format!("M {x1} {y1} L {x2} {y2}");
     }
     let ramp = (x2 - x1).abs().min((y2 - y1).abs() * 0.80);
-    let yc   = if y2 >= y1 { y2 - ramp } else { y2 + ramp };
+    let yc = if y2 >= y1 { y2 - ramp } else { y2 + ramp };
     format!("M {x1} {y1} L {x1} {yc} L {x2} {y2}")
 }
 
@@ -108,7 +108,7 @@ fn geo_v_leave(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
         return format!("M {x1} {y1} L {x2} {y2}");
     }
     let ramp = (x2 - x1).abs().min((y2 - y1).abs() * 0.80);
-    let yc   = if y2 >= y1 { y1 + ramp } else { y1 - ramp };
+    let yc = if y2 >= y1 { y1 + ramp } else { y1 - ramp };
     format!("M {x1} {y1} L {x2} {yc} L {x2} {y2}")
 }
 
@@ -126,18 +126,18 @@ pub fn TreeCanvas(
     on_select: EventHandler<CommitNode>,
     on_deselect: EventHandler<()>,
 ) -> Element {
-    let mut scale       = use_signal(|| 1.0_f64);
-    let mut offset_x    = use_signal(|| 0.0_f64);
-    let mut offset_y    = use_signal(|| 0.0_f64);
+    let mut scale = use_signal(|| 1.0_f64);
+    let mut offset_x = use_signal(|| 0.0_f64);
+    let mut offset_y = use_signal(|| 0.0_f64);
     let mut is_dragging = use_signal(|| false);
-    let mut drag_sx     = use_signal(|| 0.0_f64);
-    let mut drag_sy     = use_signal(|| 0.0_f64);
+    let mut drag_sx = use_signal(|| 0.0_f64);
+    let mut drag_sy = use_signal(|| 0.0_f64);
 
     let Some(tree) = tree else {
         return rsx! { div { class: "canvas-empty", "> NO REPOSITORY LOADED" } };
     };
 
-    let is_vertical  = direction  == TreeDirection::Vertical;
+    let is_vertical = direction == TreeDirection::Vertical;
     let is_geometric = branch_style == BranchStyle::Geometric;
 
     let visible: Vec<CommitNode> = tree
@@ -166,10 +166,18 @@ pub fn TreeCanvas(
             let (x, y) = if is_vertical {
                 let y = 100.0 + i as f64 * node_spacing;
                 let x = if commit.is_merge {
-                    let base = if i % 2 == 0 { V_H_BRANCH_LEFT } else { V_H_BRANCH_RIGHT };
+                    let base = if i % 2 == 0 {
+                        V_H_BRANCH_LEFT
+                    } else {
+                        V_H_BRANCH_RIGHT
+                    };
                     // Geometric: push a little further from spine so flat top is obvious
                     if is_geometric {
-                        if i % 2 == 0 { base - 15.0 } else { base + 15.0 }
+                        if i % 2 == 0 {
+                            base - 15.0
+                        } else {
+                            base + 15.0
+                        }
                     } else {
                         base
                     }
@@ -180,9 +188,17 @@ pub fn TreeCanvas(
             } else {
                 let x = 100.0 + i as f64 * node_spacing;
                 let y = if commit.is_merge {
-                    let base = if i % 2 == 0 { H_V_BRANCH_UP } else { H_V_BRANCH_DOWN };
+                    let base = if i % 2 == 0 {
+                        H_V_BRANCH_UP
+                    } else {
+                        H_V_BRANCH_DOWN
+                    };
                     if is_geometric {
-                        if i % 2 == 0 { base - 15.0 } else { base + 15.0 }
+                        if i % 2 == 0 {
+                            base - 15.0
+                        } else {
+                            base + 15.0
+                        }
                     } else {
                         base
                     }
@@ -209,9 +225,9 @@ pub fn TreeCanvas(
         .collect::<Vec<_>>();
 
     let handle_key = {
-        let commits  = commits_for_kb.clone();
+        let commits = commits_for_kb.clone();
         let selected = selected_hash.clone();
-        let vert     = is_vertical;
+        let vert = is_vertical;
         move |e: KeyboardEvent| {
             let (fwd, back) = if vert {
                 (Key::ArrowDown, Key::ArrowUp)
@@ -220,19 +236,28 @@ pub fn TreeCanvas(
             };
             if e.key() == fwd {
                 let next = match &selected {
-                    None    => commits.first().cloned(),
-                    Some(h) => commits.iter().position(|c| &c.hash == h)
-                        .and_then(|i| commits.get(i + 1)).cloned(),
+                    None => commits.first().cloned(),
+                    Some(h) => commits
+                        .iter()
+                        .position(|c| &c.hash == h)
+                        .and_then(|i| commits.get(i + 1))
+                        .cloned(),
                 };
-                if let Some(c) = next { on_select.call(c); }
+                if let Some(c) = next {
+                    on_select.call(c);
+                }
             } else if e.key() == back {
                 let prev = match &selected {
-                    None    => commits.last().cloned(),
-                    Some(h) => commits.iter().position(|c| &c.hash == h)
-                        .and_then(|i| i.checked_sub(1)
-                            .and_then(|j| commits.get(j))).cloned(),
+                    None => commits.last().cloned(),
+                    Some(h) => commits
+                        .iter()
+                        .position(|c| &c.hash == h)
+                        .and_then(|i| i.checked_sub(1).and_then(|j| commits.get(j)))
+                        .cloned(),
                 };
-                if let Some(c) = prev { on_select.call(c); }
+                if let Some(c) = prev {
+                    on_select.call(c);
+                }
             } else if e.key() == Key::Escape {
                 on_deselect.call(());
             }
@@ -486,11 +511,15 @@ fn CommitDot(
     dimmed: bool,
     on_click: EventHandler<CommitNode>,
 ) -> Element {
-    let color    = commit.color.clone();
-    let fill     = if selected { color.clone() } else { "#000000".to_string() };
+    let color = commit.color.clone();
+    let fill = if selected {
+        color.clone()
+    } else {
+        "#000000".to_string()
+    };
     let stroke_w = if selected { "3" } else { "2" };
-    let opacity  = if dimmed { "0.08" } else { "1" };
-    let c        = commit.clone();
+    let opacity = if dimmed { "0.08" } else { "1" };
+    let c = commit.clone();
 
     let (label_x, label_y, label_anchor) = if is_vertical {
         (x + NODE_RADIUS + 10.0, y + 4.0, "start")

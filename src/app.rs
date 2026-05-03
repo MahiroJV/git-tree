@@ -25,23 +25,23 @@ pub enum Screen {
 
 #[component]
 pub fn App() -> Element {
-    let mut screen          = use_signal(|| Screen::Home);
+    let mut screen = use_signal(|| Screen::Home);
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
-    let mut theme_name      = use_signal(|| "Terminal".to_string());
-    let mut search_query    = use_signal(String::new);
-    let mut left_open       = use_signal(|| true);
-    let mut right_open      = use_signal(|| true);
-    let mut clone_error     = use_signal(|| Option::<String>::None);
-    let mut font_size       = use_signal(|| 13_u32);
-    let mut node_spacing    = use_signal(|| 120.0_f64);
-    let mut show_merges     = use_signal(|| true);
-    let mut crt_overlay     = use_signal(|| false);
-    let mut tree_direction  = use_signal(|| TreeDirection::Horizontal);
-    let mut branch_style    = use_signal(|| BranchStyle::Curved);
+    let mut theme_name = use_signal(|| "Terminal".to_string());
+    let mut search_query = use_signal(String::new);
+    let mut left_open = use_signal(|| true);
+    let mut right_open = use_signal(|| true);
+    let mut clone_error = use_signal(|| Option::<String>::None);
+    let mut font_size = use_signal(|| 13_u32);
+    let mut node_spacing = use_signal(|| 120.0_f64);
+    let mut show_merges = use_signal(|| true);
+    let mut crt_overlay = use_signal(|| false);
+    let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
+    let mut branch_style = use_signal(|| BranchStyle::Curved);
 
     let theme_css = use_memo(move || {
-        let t  = theme_by_name(&theme_name.read());
+        let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
         format!(
             ":root {{ \
@@ -50,15 +50,15 @@ pub fn App() -> Element {
                 --success:{su}; --danger:{da}; \
                 --font-size:{fs}px; \
             }}",
-            bg  = t.bg,
+            bg = t.bg,
             bgs = t.bg_secondary,
             text = t.text,
-            tm  = t.text_muted,
-            ac  = t.accent,
-            bo  = t.border,
-            su  = t.success,
-            da  = t.danger,
-            fs  = fs,
+            tm = t.text_muted,
+            ac = t.accent,
+            bo = t.border,
+            su = t.success,
+            da = t.danger,
+            fs = fs,
         )
     });
 
