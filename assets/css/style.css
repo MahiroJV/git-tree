@@ -708,3 +708,133 @@ html, body, #main {
 .diff-file-path,
 .diff-file-row,
 .recent-item-path
+    /* ═══════════════════════════════════════════════════════════════════════════
+       SEARCH ONLINE — results list
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+.search-results-header {
+    width: 100%;
+    max-width: 580px;
+    text-align: center;
+    padding: 6px 0 2px;
+}
+
+.search-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 580px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.search-results-list::-webkit-scrollbar       { width: 5px; }
+.search-results-list::-webkit-scrollbar-track { background: var(--bg); }
+.search-results-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.search-results-list::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ── Individual result card ── */
+.search-result-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid #1a1a1a;
+    background: var(--bg-secondary);
+    transition: border-color 0.15s;
+}
+
+.search-result-card:hover {
+    border-color: rgba(155, 93, 229, 0.35);
+}
+
+/* top row: repo name left, clone button right */
+.search-result-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.search-result-name {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    word-break: break-all;
+    flex: 1;
+    min-width: 0;
+}
+
+.search-clone-btn {
+    flex-shrink: 0;
+    font-size: 9px;
+    padding: 4px 10px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+}
+
+.search-clone-btn--active {
+    opacity: 0.65;
+    cursor: default;
+}
+
+/* description */
+.search-result-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    letter-spacing: 0.03em;
+    /* clamp to 2 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* topic badges */
+.search-result-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.search-topic-badge {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    border: 1px solid rgba(155, 93, 229, 0.35);
+    padding: 1px 6px;
+    border-radius: 2px;
+}
+
+/* meta row: language · stars · forks · license */
+.search-result-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.search-meta-item {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.search-meta-lang-dot {
+    font-size: 9px;
+    color: var(--success);
+}
+
+.search-meta-license {
+    font-size: 9px;
+    color: var(--text-muted);
+    border: 1px solid #222;
+    padding: 1px 5px;
+}

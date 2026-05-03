@@ -8,24 +8,19 @@ description = "A terminal-style git branch visualizer"
 [dependencies]
 dioxus = { version = "0.6", features = ["desktop"] }
 rfd = "0.12"
-# Git operations (local + remote clone)
 git2 = "0.19"
-arboard = "3"
 tokio = { version = "1.52.0", features = ["rt-multi-thread"] }
-# Config file (~/.config/git-tree/config.toml)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
-# App data directories (cross-platform config path)
 dirs = "5"
-# Unique colors per contributor (hash name → color)
 sha2 = "0.10"
-# Date/time formatting
 chrono = { version = "0.4", features = ["serde"] }
-# Error handling
 anyhow = "1"
 image = "0.25.10"
 web-sys = { version = "0.3.97", features = ["Navigator"] }
+reqwest = { version = "0.12", features = ["json"] }
+urlencoding = "2"
 
 [profile.release]
 opt-level = 3

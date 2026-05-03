@@ -1,4 +1,4 @@
-// components/tree_canvas.rs — horizontal + vertical layout support
+// components/tree_canvas.rs
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
@@ -8,18 +8,22 @@ use dioxus::prelude::*;
 const NODE_RADIUS: f64 = 10.0;
 
 // Horizontal mode
-const H_CANVAS_HEIGHT: f64 = 500.0;
-const H_V_MAIN: f64 = 250.0;
-const H_V_BRANCH_UP: f64 = 120.0;
-const H_V_BRANCH_DOWN: f64 = 380.0;
+const H_CANVAS_HEIGHT: f64  = 500.0;
+const H_V_MAIN: f64         = 250.0;
+const H_V_BRANCH_UP: f64    = 130.0;  // 120 px above main
+const H_V_BRANCH_DOWN: f64  = 370.0;  // 120 px below main
 
 // Vertical mode
-const V_CANVAS_WIDTH: f64 = 600.0;
-const V_H_MAIN: f64 = 300.0;
-const V_H_BRANCH_LEFT: f64 = 140.0;
-const V_H_BRANCH_RIGHT: f64 = 460.0;
+const V_CANVAS_WIDTH: f64   = 600.0;
+const V_H_MAIN: f64         = 300.0;
+const V_H_BRANCH_LEFT: f64  = 175.0;
+const V_H_BRANCH_RIGHT: f64 = 425.0;
 
-// ── Direction enum ────────────────────────────────────────────────────────────
+/// Half-width (px) of the flat-top segment in Geometric mode.
+/// The merge node is centred at the midpoint of this segment.
+const FLAT_HALF: f64 = 28.0;
+
+// ── Public enums ──────────────────────────────────────────────────────────────
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum TreeDirection {
@@ -27,7 +31,21 @@ pub enum TreeDirection {
     Vertical,
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+/// Controls how branch connector lines are drawn.
+#[derive(Clone, PartialEq, Debug)]
+pub enum BranchStyle {
+    /// Smooth cubic-bezier S-curves, node at peak.
+    Curved,
+    /// Flat-top trapezoid with a centred node:
+    ///
+    ///   Horizontal:   ───/──●──\───
+    ///   Vertical:     |
+    ///                 ├──●──┤
+    ///                 |
+    Geometric,
+}
+
+// ── Search helper ─────────────────────────────────────────────────────────────
 
 fn commit_matches(commit: &CommitNode, query: &str) -> bool {
     if query.is_empty() {
@@ -42,16 +60,56 @@ fn commit_matches(commit: &CommitNode, query: &str) -> bool {
         || commit.hash.to_lowercase().contains(&q)
 }
 
-/// Horizontal bezier — control points bend on the Y axis
+// ── Path builders — Curved ────────────────────────────────────────────────────
+
 fn bezier_h(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
     let cx = x1 + (x2 - x1) * 0.5;
     format!("M {x1} {y1} C {cx} {y1}, {cx} {y2}, {x2} {y2}")
 }
 
-/// Vertical bezier — control points bend on the X axis
 fn bezier_v(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
     let cy = y1 + (y2 - y1) * 0.5;
     format!("M {x1} {y1} C {x1} {cy}, {x2} {cy}, {x2} {y2}")
+}
+
+/// H approach: stay at y1, then angle up/down to (x2, y2)
+fn geo_h_approach(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
+    if (y2 - y1).abs() < 1.0 {
+        return format!("M {x1} {y1} L {x2} {y2}");
+    }
+    let ramp = (y2 - y1).abs().min((x2 - x1).abs() * 0.80);
+    let xc   = if x2 >= x1 { x2 - ramp } else { x2 + ramp };
+    format!("M {x1} {y1} L {xc} {y1} L {x2} {y2}")
+}
+
+/// H leave: angle from (x1, y1) back to main y2, then stay flat
+fn geo_h_leave(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
+    if (y2 - y1).abs() < 1.0 {
+        return format!("M {x1} {y1} L {x2} {y2}");
+    }
+    let ramp = (y2 - y1).abs().min((x2 - x1).abs() * 0.80);
+    let xc   = if x2 >= x1 { x1 + ramp } else { x1 - ramp };
+    format!("M {x1} {y1} L {xc} {y2} L {x2} {y2}")
+}
+
+/// V approach: stay at x1, then angle out to (x2, y2)
+fn geo_v_approach(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
+    if (x2 - x1).abs() < 1.0 {
+        return format!("M {x1} {y1} L {x2} {y2}");
+    }
+    let ramp = (x2 - x1).abs().min((y2 - y1).abs() * 0.80);
+    let yc   = if y2 >= y1 { y2 - ramp } else { y2 + ramp };
+    format!("M {x1} {y1} L {x1} {yc} L {x2} {y2}")
+}
+
+/// V leave: angle from (x1, y1) back to main x2, then stay straight
+fn geo_v_leave(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
+    if (x2 - x1).abs() < 1.0 {
+        return format!("M {x1} {y1} L {x2} {y2}");
+    }
+    let ramp = (x2 - x1).abs().min((y2 - y1).abs() * 0.80);
+    let yc   = if y2 >= y1 { y1 + ramp } else { y1 - ramp };
+    format!("M {x1} {y1} L {x2} {yc} L {x2} {y2}")
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -64,23 +122,24 @@ pub fn TreeCanvas(
     node_spacing: f64,
     show_merges: bool,
     direction: TreeDirection,
+    branch_style: BranchStyle,
     on_select: EventHandler<CommitNode>,
     on_deselect: EventHandler<()>,
 ) -> Element {
-    let mut scale = use_signal(|| 1.0_f64);
-    let mut offset_x = use_signal(|| 0.0_f64);
-    let mut offset_y = use_signal(|| 0.0_f64);
+    let mut scale       = use_signal(|| 1.0_f64);
+    let mut offset_x    = use_signal(|| 0.0_f64);
+    let mut offset_y    = use_signal(|| 0.0_f64);
     let mut is_dragging = use_signal(|| false);
-    let mut drag_start_x = use_signal(|| 0.0_f64);
-    let mut drag_start_y = use_signal(|| 0.0_f64);
+    let mut drag_sx     = use_signal(|| 0.0_f64);
+    let mut drag_sy     = use_signal(|| 0.0_f64);
 
     let Some(tree) = tree else {
         return rsx! { div { class: "canvas-empty", "> NO REPOSITORY LOADED" } };
     };
 
-    let is_vertical = direction == TreeDirection::Vertical;
+    let is_vertical  = direction  == TreeDirection::Vertical;
+    let is_geometric = branch_style == BranchStyle::Geometric;
 
-    // Filter commits
     let visible: Vec<CommitNode> = tree
         .commits
         .iter()
@@ -90,14 +149,16 @@ pub fn TreeCanvas(
 
     let count = visible.len().max(1);
 
-    // Canvas dimensions depend on direction
     let (canvas_width, canvas_height) = if is_vertical {
         (V_CANVAS_WIDTH, (count as f64 * node_spacing) + 200.0)
     } else {
         ((count as f64 * node_spacing) + 200.0, H_CANVAS_HEIGHT)
     };
 
-    // Position each commit
+    // ── Position each commit ──────────────────────────────────────────────────
+    //
+    // Geometric mode: merge nodes are pushed slightly further away from main so
+    // the flat-top segment is clearly visible.  Curved mode keeps original offsets.
     let positioned: Vec<(CommitNode, f64, f64, bool)> = visible
         .iter()
         .enumerate()
@@ -105,10 +166,12 @@ pub fn TreeCanvas(
             let (x, y) = if is_vertical {
                 let y = 100.0 + i as f64 * node_spacing;
                 let x = if commit.is_merge {
-                    if i % 2 == 0 {
-                        V_H_BRANCH_LEFT
+                    let base = if i % 2 == 0 { V_H_BRANCH_LEFT } else { V_H_BRANCH_RIGHT };
+                    // Geometric: push a little further from spine so flat top is obvious
+                    if is_geometric {
+                        if i % 2 == 0 { base - 15.0 } else { base + 15.0 }
                     } else {
-                        V_H_BRANCH_RIGHT
+                        base
                     }
                 } else {
                     V_H_MAIN
@@ -117,18 +180,18 @@ pub fn TreeCanvas(
             } else {
                 let x = 100.0 + i as f64 * node_spacing;
                 let y = if commit.is_merge {
-                    if i % 2 == 0 {
-                        H_V_BRANCH_UP
+                    let base = if i % 2 == 0 { H_V_BRANCH_UP } else { H_V_BRANCH_DOWN };
+                    if is_geometric {
+                        if i % 2 == 0 { base - 15.0 } else { base + 15.0 }
                     } else {
-                        H_V_BRANCH_DOWN
+                        base
                     }
                 } else {
                     H_V_MAIN
                 };
                 (x, y)
             };
-            let matches = commit_matches(commit, &search_query);
-            (commit.clone(), x, y, matches)
+            (commit.clone(), x, y, commit_matches(commit, &search_query))
         })
         .collect();
 
@@ -138,7 +201,7 @@ pub fn TreeCanvas(
         Some(positioned.iter().filter(|(_, _, _, m)| *m).count())
     };
 
-    // Keyboard nav
+    // ── Keyboard nav ──────────────────────────────────────────────────────────
     let commits_for_kb = positioned
         .iter()
         .filter(|(_, _, _, m)| *m)
@@ -146,9 +209,9 @@ pub fn TreeCanvas(
         .collect::<Vec<_>>();
 
     let handle_key = {
-        let commits = commits_for_kb.clone();
+        let commits  = commits_for_kb.clone();
         let selected = selected_hash.clone();
-        let vert = is_vertical;
+        let vert     = is_vertical;
         move |e: KeyboardEvent| {
             let (fwd, back) = if vert {
                 (Key::ArrowDown, Key::ArrowUp)
@@ -157,34 +220,25 @@ pub fn TreeCanvas(
             };
             if e.key() == fwd {
                 let next = match &selected {
-                    None => commits.first().cloned(),
-                    Some(h) => {
-                        let idx = commits.iter().position(|c| &c.hash == h);
-                        idx.and_then(|i| commits.get(i + 1)).cloned()
-                    }
+                    None    => commits.first().cloned(),
+                    Some(h) => commits.iter().position(|c| &c.hash == h)
+                        .and_then(|i| commits.get(i + 1)).cloned(),
                 };
-                if let Some(c) = next {
-                    on_select.call(c);
-                }
+                if let Some(c) = next { on_select.call(c); }
             } else if e.key() == back {
                 let prev = match &selected {
-                    None => commits.last().cloned(),
-                    Some(h) => {
-                        let idx = commits.iter().position(|c| &c.hash == h);
-                        idx.and_then(|i| i.checked_sub(1).and_then(|j| commits.get(j)))
-                            .cloned()
-                    }
+                    None    => commits.last().cloned(),
+                    Some(h) => commits.iter().position(|c| &c.hash == h)
+                        .and_then(|i| i.checked_sub(1)
+                            .and_then(|j| commits.get(j))).cloned(),
                 };
-                if let Some(c) = prev {
-                    on_select.call(c);
-                }
+                if let Some(c) = prev { on_select.call(c); }
             } else if e.key() == Key::Escape {
                 on_deselect.call(());
             }
         }
     };
 
-    // Hint text
     let hint = match match_count {
         Some(n) => format!(
             "{n} match{}  ·  {} navigate  ·  ESC deselect",
@@ -206,7 +260,8 @@ pub fn TreeCanvas(
 
             // ── Zoom controls ─────────────────────────────────────────────
             div {
-                style: "position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px;",
+                style: "position: absolute; top: 12px; right: 12px; \
+                        z-index: 10; display: flex; gap: 6px;",
                 button {
                     class: "toolbar-btn",
                     onclick: move |_| { let s = (*scale.read() + 0.1).min(3.0); scale.set(s); },
@@ -214,12 +269,16 @@ pub fn TreeCanvas(
                 }
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_|  { let s = (*scale.read() - 0.1).max(0.2); scale.set(s); },
+                    onclick: move |_| { let s = (*scale.read() - 0.1).max(0.2); scale.set(s); },
                     "[ - ]"
                 }
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| { scale.set(1.0); offset_x.set(0.0); offset_y.set(0.0); },
+                    onclick: move |_| {
+                        scale.set(1.0);
+                        offset_x.set(0.0);
+                        offset_y.set(0.0);
+                    },
                     "[ RESET ]"
                 }
             }
@@ -229,11 +288,11 @@ pub fn TreeCanvas(
                 style: "position: absolute; bottom: 10px; left: 50%; \
                         transform: translateX(-50%); z-index: 10; \
                         color: var(--text-muted); font-size: 10px; \
-                        letter-spacing: 0.12em; pointer-events: none; white-space: nowrap;",
+                        letter-spacing: 0.12em; pointer-events: none; \
+                        white-space: nowrap;",
                 "{hint}"
             }
 
-            // ── SVG canvas ────────────────────────────────────────────────
             div {
                 style: "width: 100%; height: 100%; overflow: hidden;",
 
@@ -256,13 +315,13 @@ pub fn TreeCanvas(
                 },
                 onmousedown: move |e| {
                     is_dragging.set(true);
-                    drag_start_x.set(e.client_coordinates().x - *offset_x.read());
-                    drag_start_y.set(e.client_coordinates().y - *offset_y.read());
+                    drag_sx.set(e.client_coordinates().x - *offset_x.read());
+                    drag_sy.set(e.client_coordinates().y - *offset_y.read());
                 },
                 onmousemove: move |e| {
                     if *is_dragging.read() {
-                        offset_x.set(e.client_coordinates().x - *drag_start_x.read());
-                        offset_y.set(e.client_coordinates().y - *drag_start_y.read());
+                        offset_x.set(e.client_coordinates().x - *drag_sx.read());
+                        offset_y.set(e.client_coordinates().y - *drag_sy.read());
                     }
                 },
                 onmouseup:    move |_| is_dragging.set(false),
@@ -272,7 +331,8 @@ pub fn TreeCanvas(
                     width:  "{canvas_width}",
                     height: "{canvas_height}",
                     xmlns:  "http://www.w3.org/2000/svg",
-                    style:  "transform: scale({scale}) translate({offset_x}px, {offset_y}px); \
+                    style:  "transform: scale({scale}) \
+                             translate({offset_x}px, {offset_y}px); \
                              transform-origin: 0 0; display: block;",
 
                     defs {
@@ -284,7 +344,7 @@ pub fn TreeCanvas(
                     }
                     rect { width:"100%", height:"100%", fill:"url(#dotgrid)" }
 
-                    // ── Main branch spine ─────────────────────────────────
+                    // ── Main spine ────────────────────────────────────────
                     if is_vertical {
                         line {
                             x1: "{V_H_MAIN}", y1: "40",
@@ -294,35 +354,104 @@ pub fn TreeCanvas(
                         }
                     } else {
                         line {
-                            x1: "40",                     y1: "{H_V_MAIN}",
-                            x2: "{canvas_width - 40.0}",  y2: "{H_V_MAIN}",
+                            x1: "40",
+                            y1: "{H_V_MAIN}",
+                            x2: "{canvas_width - 40.0}",
+                            y2: "{H_V_MAIN}",
                             stroke: "var(--accent)", stroke_width: "2",
                             opacity: if search_query.is_empty() { "0.6" } else { "0.15" }
                         }
                     }
 
-                    // ── Branch bezier curves ──────────────────────────────
+                    // ── Branch connectors ─────────────────────────────────
                     for (commit, x, y, matches) in &positioned {
                         if commit.is_merge {
                             {
-                                let opacity = if search_query.is_empty() || *matches { "1" } else { "0.08" };
-                                let color   = commit.color.clone();
-
-                                // Entry and exit curves differ by direction
-                                let (d_in, d_out) = if is_vertical {
-                                    (
-                                        bezier_v(V_H_MAIN, y - node_spacing, *x, *y),
-                                        bezier_v(*x, *y, V_H_MAIN, y + node_spacing),
-                                    )
+                                let opacity = if search_query.is_empty() || *matches {
+                                    "1"
                                 } else {
-                                    (
-                                        bezier_h(*x - node_spacing, H_V_MAIN, *x, *y),
-                                        bezier_h(*x, *y, *x + node_spacing, H_V_MAIN),
-                                    )
+                                    "0.08"
                                 };
-                                rsx! {
-                                    path { d:"{d_in}",  stroke:"{color}", stroke_width:"1.5", fill:"none", opacity:"{opacity}" }
-                                    path { d:"{d_out}", stroke:"{color}", stroke_width:"1.5", fill:"none", opacity:"{opacity}" }
+                                let color = commit.color.clone();
+
+                                if is_geometric {
+                                    // ─────────────────────────────────────────
+                                    // GEOMETRIC — flat-top trapezoid
+                                    //
+                                    // Three path segments per merge node:
+                                    //
+                                    //  d_approach: ───/   (flat at main, diagonal up to flat-top left edge)
+                                    //  d_flat:     ──●──  (horizontal flat top, node at centre)
+                                    //  d_leave:    \───   (diagonal down from flat-top right edge, flat at main)
+                                    //
+                                    // Vertical equivalent rotated 90°.
+                                    // ─────────────────────────────────────────
+                                    let (d_approach, d_flat, d_leave) = if is_vertical {
+                                        // flat-top is vertical: a short vertical segment at x,
+                                        // centred on y
+                                        let y_top    = *y - FLAT_HALF;
+                                        let y_bottom = *y + FLAT_HALF;
+                                        (
+                                            geo_v_approach(V_H_MAIN, *y - node_spacing, *x, y_top),
+                                            format!("M {x} {y_top} L {x} {y_bottom}"),
+                                            geo_v_leave(*x, y_bottom, V_H_MAIN, *y + node_spacing),
+                                        )
+                                    } else {
+                                        // flat-top is horizontal: a short horizontal segment at y,
+                                        // centred on x
+                                        let x_left  = *x - FLAT_HALF;
+                                        let x_right = *x + FLAT_HALF;
+                                        (
+                                            geo_h_approach(*x - node_spacing, H_V_MAIN, x_left, *y),
+                                            format!("M {x_left} {y} L {x_right} {y}"),
+                                            geo_h_leave(x_right, *y, *x + node_spacing, H_V_MAIN),
+                                        )
+                                    };
+
+                                    rsx! {
+                                        path {
+                                            d: "{d_approach}",
+                                            stroke: "{color}", stroke_width: "1.5",
+                                            fill: "none", opacity: "{opacity}",
+                                        }
+                                        path {
+                                            d: "{d_flat}",
+                                            stroke: "{color}", stroke_width: "1.5",
+                                            fill: "none", opacity: "{opacity}",
+                                        }
+                                        path {
+                                            d: "{d_leave}",
+                                            stroke: "{color}", stroke_width: "1.5",
+                                            fill: "none", opacity: "{opacity}",
+                                        }
+                                    }
+                                } else {
+                                    // ─────────────────────────────────────────
+                                    // CURVED — smooth bezier S-curves
+                                    // ─────────────────────────────────────────
+                                    let (d_in, d_out) = if is_vertical {
+                                        (
+                                            bezier_v(V_H_MAIN, *y - node_spacing, *x, *y),
+                                            bezier_v(*x, *y, V_H_MAIN, *y + node_spacing),
+                                        )
+                                    } else {
+                                        (
+                                            bezier_h(*x - node_spacing, H_V_MAIN, *x, *y),
+                                            bezier_h(*x, *y, *x + node_spacing, H_V_MAIN),
+                                        )
+                                    };
+                                    rsx! {
+                                        path {
+                                            d: "{d_in}",
+                                            stroke: "{color}", stroke_width: "1.5",
+                                            fill: "none", opacity: "{opacity}",
+                                        }
+                                        path {
+                                            d: "{d_out}",
+                                            stroke: "{color}", stroke_width: "1.5",
+                                            fill: "none", opacity: "{opacity}",
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -331,12 +460,12 @@ pub fn TreeCanvas(
                     // ── Commit nodes ──────────────────────────────────────
                     for (commit, x, y, matches) in positioned {
                         CommitDot {
-                            commit:      commit.clone(),
+                            commit:   commit.clone(),
                             x, y,
                             is_vertical,
-                            selected:    selected_hash.as_deref() == Some(&commit.hash),
-                            dimmed:      !search_query.is_empty() && !matches,
-                            on_click:    on_select,
+                            selected: selected_hash.as_deref() == Some(&commit.hash),
+                            dimmed:   !search_query.is_empty() && !matches,
+                            on_click: on_select,
                         }
                     }
                 }
@@ -345,7 +474,7 @@ pub fn TreeCanvas(
     }
 }
 
-// ── Commit node ───────────────────────────────────────────────────────────────
+// ── Commit dot ────────────────────────────────────────────────────────────────
 
 #[component]
 fn CommitDot(
@@ -357,17 +486,12 @@ fn CommitDot(
     dimmed: bool,
     on_click: EventHandler<CommitNode>,
 ) -> Element {
-    let color = commit.color.clone();
-    let fill = if selected {
-        color.clone()
-    } else {
-        "#000000".to_string()
-    };
+    let color    = commit.color.clone();
+    let fill     = if selected { color.clone() } else { "#000000".to_string() };
     let stroke_w = if selected { "3" } else { "2" };
-    let opacity = if dimmed { "0.08" } else { "1" };
-    let c = commit.clone();
+    let opacity  = if dimmed { "0.08" } else { "1" };
+    let c        = commit.clone();
 
-    // Label position — below node in horizontal, to the right in vertical
     let (label_x, label_y, label_anchor) = if is_vertical {
         (x + NODE_RADIUS + 10.0, y + 4.0, "start")
     } else {
@@ -380,20 +504,27 @@ fn CommitDot(
             onclick: move |_| { if !dimmed { on_click.call(c.clone()); } },
 
             if selected {
-                circle { cx:"{x}", cy:"{y}", r:"{NODE_RADIUS + 6.0}",
-                    fill:"none", stroke:"{color}", stroke_width:"1", opacity:"0.25" }
+                circle {
+                    cx: "{x}", cy: "{y}", r: "{NODE_RADIUS + 6.0}",
+                    fill: "none", stroke: "{color}",
+                    stroke_width: "1", opacity: "0.25"
+                }
             }
 
-            circle { cx:"{x}", cy:"{y}", r:"{NODE_RADIUS}",
-                fill:"{fill}", stroke:"{color}", stroke_width:"{stroke_w}" }
+            circle {
+                cx: "{x}", cy: "{y}", r: "{NODE_RADIUS}",
+                fill: "{fill}", stroke: "{color}", stroke_width: "{stroke_w}"
+            }
 
             if commit.is_head {
                 text {
                     x: if is_vertical { "{x + NODE_RADIUS + 10.0}" } else { "{x}" },
-                    y: if is_vertical { "{y - NODE_RADIUS - 2.0}" } else { "{y - NODE_RADIUS - 14.0}" },
+                    y: if is_vertical { "{y - NODE_RADIUS - 2.0}" }
+                       else           { "{y - NODE_RADIUS - 14.0}" },
                     text_anchor: if is_vertical { "start" } else { "middle" },
-                    font_size:"10", font_family:"Space Mono, monospace",
-                    fill:"var(--accent)", font_weight:"bold", letter_spacing:"0.1em",
+                    font_size: "10", font_family: "Space Mono, monospace",
+                    fill: "var(--accent)", font_weight: "bold",
+                    letter_spacing: "0.1em",
                     "HEAD"
                 }
             }
@@ -401,32 +532,32 @@ fn CommitDot(
             for (i, tag) in commit.tags.iter().enumerate() {
                 text {
                     x: if is_vertical { "{x + NODE_RADIUS + 10.0}" } else { "{x}" },
-                    y: if is_vertical { "{y - NODE_RADIUS - 16.0 - (i as f64 * 14.0)}" }
-                       else           { "{y - NODE_RADIUS - 28.0 - (i as f64 * 15.0)}" },
+                    y: if is_vertical {
+                           "{y - NODE_RADIUS - 16.0 - (i as f64 * 14.0)}"
+                       } else {
+                           "{y - NODE_RADIUS - 28.0 - (i as f64 * 15.0)}"
+                       },
                     text_anchor: if is_vertical { "start" } else { "middle" },
-                    font_size:"9", font_family:"Space Mono, monospace",
-                    fill:"var(--success)",
+                    font_size: "9", font_family: "Space Mono, monospace",
+                    fill: "var(--success)",
                     "◆ {tag}"
                 }
             }
 
-            // Short hash label
             text {
-                x:           "{label_x}",
-                y:           "{label_y}",
+                x: "{label_x}", y: "{label_y}",
                 text_anchor: "{label_anchor}",
-                font_size:   "10",
-                font_family: "Space Mono, monospace",
-                fill:        "var(--text-muted)",
-                letter_spacing: "0.05em",
+                font_size: "10", font_family: "Space Mono, monospace",
+                fill: "var(--text-muted)", letter_spacing: "0.05em",
                 "{commit.short_hash}"
             }
 
             if commit.is_merge {
                 text {
-                    x:"{x}", y:"{y + 4.0}", text_anchor:"middle",
-                    font_size:"8", font_family:"Space Mono, monospace",
-                    fill:"{color}", "M"
+                    x: "{x}", y: "{y + 4.0}", text_anchor: "middle",
+                    font_size: "8", font_family: "Space Mono, monospace",
+                    fill: "{color}",
+                    "M"
                 }
             }
         }
