@@ -44,3 +44,7 @@ inherits = "dev"
 
 [profile.android-dev]
 inherits = "dev"
+
+[[bin]]
+name = "git-tree"
+path = "src/main.rs"
