@@ -4,11 +4,18 @@ version = "0.2.0"
 edition = "2021"
 authors = ["MahiroJV"]
 description = "A terminal-style git branch visualizer"
+license = "MIT"
+repository = "https://github.com/MahiroJV/git-tree"
+homepage = "https://github.com/MahiroJV/git-tree"
+keywords = ["git", "visualizer", "terminal", "dioxus", "tui"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
+exclude = ["assets/fonts/*.ttf", ".idea/"]
 
 [dependencies]
 dioxus = { version = "0.6", features = ["desktop"] }
 rfd = "0.12"
-git2 = "0.19"
+git2 = { version = "0.19", features = ["vendored-libgit2"] }
 tokio = { version = "1.52.0", features = ["rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -21,6 +28,7 @@ image = "0.25.10"
 web-sys = { version = "0.3.97", features = ["Navigator"] }
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [profile.release]
 opt-level = 3
