@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [ "master", "main" ]
@@ -7,23 +6,18 @@ on:
       - 'v*'
   pull_request:
     branches: [ "master", "main" ]
-
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -39,28 +33,27 @@ jobs:
             libxdo-dev \
             libgit2-dev \
             pkg-config
-
-      # Cache AFTER installing deps, BEFORE compiling anything
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-
-      # Check formatting FIRST — fastest failure, no compile needed
       - name: Check formatting
         run: cargo fmt -- --check
-
-      # Clippy SECOND — catches logic errors before full build
       - name: Clippy
         run: cargo clippy -- -D warnings
-
-      # Full release build LAST
       - name: Build
         run: cargo build --release
-
-      # Upload binary only on version tags (v*)
-      - name: Upload binary
+      - name: Upload artifact
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: git-tree-linux-${{ github.ref_name }}
           path: target/release/git-tree
           retention-days: 30
+      # ── NEW — creates a public GitHub Release with the binary attached ──
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/git-tree
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
