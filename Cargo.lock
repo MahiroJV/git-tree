@@ -2025,7 +2025,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-tree"
+name = "git-tree-viz"
 version = "0.2.0"
 dependencies = [
  "anyhow",
