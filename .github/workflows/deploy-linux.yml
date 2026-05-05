@@ -33,7 +33,7 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libgit2-dev \
             fuse3 \
-            lobxdo3 \
+            libxdo3 \
             pkg-config
 
       - name: Download Linux artifact
