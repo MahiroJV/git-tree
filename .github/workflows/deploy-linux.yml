@@ -61,9 +61,10 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 
+          
           # Binary
           cp dist/${{ env.BINARY_NAME }}-linux-x86_64 AppDir/usr/bin/${{ env.BINARY_NAME }}
-
+          cp assets/icon/icon.png AppDir/git-tree.png
           # Icon — convert SVG to PNG if needed
           sudo apt-get install -y librsvg2-bin
           rsvg-convert -w 256 -h 256 assets/icon/icon.svg \
