@@ -39,6 +39,8 @@ jobs:
                 libxdo-dev \
                 libgit2-dev \
                 libglib2.0-dev \
+                build-essential \
+                libssl-dev \
                 pkg-config
             extra-env: ""
 
