@@ -51,8 +51,8 @@ jobs:
       # ── AppImage ────────────────────────────────────────────────────────────
       - name: Download linuxdeploy + GTK plugin
         run: |
-          wget -O linuxdeploy.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy.AppImage       
+          wget -O linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage       
         #  wget -O linuxdeploy-plugin-gtk.AppImage https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-x86_64.AppImage
            
       - name: Create AppDir structure
