@@ -68,7 +68,7 @@ jobs:
         uses: ilammy/setup-nasm@v1
 
       - name: Install system dependencies (Linux only)
-        if: matrix.sys-deps != ''
+        if: matrix.runner == 'ubuntu-24.04'
         run: ${{ matrix.sys-deps }}
 
       - name: Cache cargo
