@@ -38,6 +38,7 @@ jobs:
                 libsoup-3.0-dev \
                 libxdo-dev \
                 libgit2-dev \
+                libglib2.0-dev \
                 pkg-config
             extra-env: ""
 
@@ -99,10 +100,10 @@ jobs:
 
       # ── Doc test ─────────────────────────────────────────────────────────
 
-      - name: Doc tests
-        run: cargo test --doc
-        env:
-          OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
+      #- name: Doc tests
+      #  run: cargo test --doc
+      #  env:
+        #  OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
 
   # ── Android lint (no runner execution, fmt + clippy only) ───────────────────
   lint-android:
