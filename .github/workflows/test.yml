@@ -1,0 +1,141 @@
+name: Test
+
+# Runs on every push and PR — fast feedback before builds.
+# Single file, matrix strategy: Linux + Windows in parallel.
+# Android is fmt/clippy only — can't run a desktop Dioxus app on Android runners.
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test — ${{ matrix.os-label }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      # Run both platforms even if one fails so you see the full picture
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os-label: Linux
+            sys-deps: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                libgtk-3-dev \
+                libglib2.0-dev \
+                libgdk-pixbuf-2.0-dev \
+                libcairo2-dev \
+                libpango1.0-dev \
+                libwebkit2gtk-4.1-dev \
+                libjavascriptcoregtk-4.1-dev \
+                libsoup-3.0-dev \
+                libxdo-dev \
+                libgit2-dev \
+                pkg-config
+            extra-env: ""
+
+          - runner: windows-latest
+            os-label: Windows
+            sys-deps: ""   # vendored deps handle everything on Windows
+            extra-env: "OPENSSL_STATIC=1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # Perl + NASM only needed on Windows for OpenSSL vendored build
+      - name: Install Perl (Windows only)
+        if: matrix.runner == 'windows-latest'
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: "5.38"
+
+      - name: Install NASM (Windows only)
+        if: matrix.runner == 'windows-latest'
+        uses: ilammy/setup-nasm@v1
+
+      - name: Install system dependencies (Linux only)
+        if: matrix.sys-deps != ''
+        run: ${{ matrix.sys-deps }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.runner }}
+
+      # ── Code quality gates ───────────────────────────────────────────────
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy — deny warnings
+        run: cargo clippy -- -D warnings
+        env:
+          OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
+
+      # ── Unit + integration tests ─────────────────────────────────────────
+      #
+      # git-tree is currently mostly integration/UI code with limited unit
+      # tests. As you add tests (e.g. parser logic, search helpers, theme
+      # functions) they will be picked up automatically here.
+
+      - name: Run tests
+        run: cargo test --all-features -- --nocapture
+        env:
+          OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
+          # Suppress GUI-related panics in headless CI
+          DISPLAY: ""
+
+      # ── Doc test ─────────────────────────────────────────────────────────
+
+      - name: Doc tests
+        run: cargo test --doc
+        env:
+          OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
+
+  # ── Android lint (no runner execution, fmt + clippy only) ───────────────────
+  lint-android:
+    name: Lint — Android target
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: rustfmt, clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libgit2-dev \
+            pkg-config
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: lint-android
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      # Clippy against host target is enough to catch logic errors;
+      # cross-clippy for Android requires a full NDK setup which is slow
+      - name: Clippy (host)
+        run: cargo clippy -- -D warnings

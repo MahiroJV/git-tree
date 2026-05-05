@@ -1,0 +1,78 @@
+name: Build — Windows
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Name of the uploaded artifact"
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: git-tree
+
+jobs:
+  build:
+    name: Build Windows x86_64
+    runs-on: windows-latest
+
+    outputs:
+      artifact-name: ${{ steps.meta.outputs.artifact-name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # Windows needs Perl for OpenSSL vendored build
+      - name: Install Perl (for OpenSSL)
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: "5.38"
+
+      # NASM is required by the OpenSSL vendored build on Windows
+      - name: Install NASM
+        uses: ilammy/setup-nasm@v1
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        # Windows doesn't have all Linux-specific lints — keep warnings but don't fail
+        run: cargo clippy
+        env:
+          # vendored deps need these set on Windows
+          OPENSSL_STATIC: "1"
+          LIBGIT2_SYS_USE_PKG_CONFIG: "0"
+
+      - name: Build release
+        run: cargo build --release
+        env:
+          OPENSSL_STATIC: "1"
+          LIBGIT2_SYS_USE_PKG_CONFIG: "0"
+
+      - name: Set artifact metadata
+        id: meta
+        shell: bash
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "artifact-name=${{ env.BINARY_NAME }}-windows-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact-name }}
+          # .exe extension is added automatically by cargo on Windows
+          path: target/release/${{ env.BINARY_NAME }}.exe
+          retention-days: 7
+          if-no-files-found: error

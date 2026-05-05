@@ -1,0 +1,166 @@
+name: Deploy — Linux
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  BINARY_NAME: git-tree
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    uses: ./.github/workflows/build-linux.yml
+
+  # ── 3. Package — raw binary + AppImage ────────────────────────────────────
+  package:
+    name: Package Linux
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libgit2-dev \
+            libfuse2 \
+            pkg-config
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      - name: Rename binary
+        run: |
+          VERSION="${{ github.ref_name }}"
+          mv dist/${{ env.BINARY_NAME }} dist/${{ env.BINARY_NAME }}-linux-x86_64
+          chmod +x dist/${{ env.BINARY_NAME }}-linux-x86_64
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      # ── AppImage ────────────────────────────────────────────────────────────
+      - name: Download linuxdeploy + GTK plugin
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk-x86_64.AppImage
+
+      - name: Create AppDir structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+
+          # Binary
+          cp dist/${{ env.BINARY_NAME }}-linux-x86_64 AppDir/usr/bin/${{ env.BINARY_NAME }}
+
+          # Icon — convert SVG to PNG if needed
+          sudo apt-get install -y librsvg2-bin
+          rsvg-convert -w 256 -h 256 assets/icon/icon.svg \
+            > AppDir/usr/share/icons/hicolor/256x256/apps/${{ env.BINARY_NAME }}.png
+
+          # .desktop file
+          cat > AppDir/${{ env.BINARY_NAME }}.desktop << EOF
+          [Desktop Entry]
+          Name=git-tree
+          Comment=Terminal-style git branch visualizer
+          Exec=git-tree
+          Icon=git-tree
+          Terminal=false
+          Type=Application
+          Categories=Development;
+          EOF
+
+      - name: Build AppImage
+        env:
+          DEPLOY_GTK_VERSION: 3
+        run: |
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin gtk \
+            --output appimage
+          # linuxdeploy names it git-tree-x86_64.AppImage automatically
+          mv ${{ env.BINARY_NAME }}-x86_64.AppImage \
+             dist/${{ env.BINARY_NAME }}-${{ env.VERSION }}-x86_64.AppImage
+
+      - name: Compute SHA256
+        run: |
+          cd dist
+          sha256sum ${{ env.BINARY_NAME }}-linux-x86_64 \
+                    ${{ env.BINARY_NAME }}-${{ env.VERSION }}-x86_64.AppImage \
+            > SHA256SUMS-linux.txt
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packaged-${{ github.ref_name }}
+          path: dist/
+          retention-days: 7
+
+  # ── 4. GitHub Release ──────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (Linux)
+    needs: [build, package]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-packaged-${{ github.ref_name }}
+          path: dist/
+
+      - name: Build release notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[?${VERSION#v}\]?/{found=1; next} found && /^## /{exit} found{print}" \
+              CHANGELOG.md > release_notes.txt
+          fi
+          if [ ! -s release_notes.txt ]; then
+            cat > release_notes.txt << 'EOF'
+          ## Linux Installation
+
+          ### AppImage (recommended — no install needed)
+          ```bash
+          chmod +x git-tree-*-x86_64.AppImage
+          ./git-tree-*-x86_64.AppImage
+          ```
+  
+          ### Raw binary
+          ```bash
+          chmod +x git-tree-linux-x86_64
+          ./git-tree-linux-x86_64
+          ```
+
+          **System deps for raw binary:**
+          `libgit2` `webkit2gtk-4.1` `gtk3` `libxdo`
+          EOF
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "git-tree ${{ github.ref_name }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+                    dist/${{ env.BINARY_NAME }}-linux-x86_64
+                    dist/${{ env.BINARY_NAME }}-${{ github.ref_name }}-x86_64.AppImage
+                    dist/SHA256SUMS-linux.txt
+

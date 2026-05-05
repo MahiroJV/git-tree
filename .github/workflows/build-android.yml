@@ -1,0 +1,98 @@
+name: Build — Android
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Name of the uploaded artifact"
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Target ABI — arm64-v8a covers all modern Android phones including Poco X6 Pro
+  ANDROID_TARGET: aarch64-linux-android
+  # Minimum Android API level (API 24 = Android 7.0, safe baseline)
+  MIN_SDK: 24
+  NDK_VERSION: "26.3.11579264"
+
+jobs:
+  build:
+    name: Build Android arm64-v8a
+    runs-on: ubuntu-latest
+
+    outputs:
+      artifact-name: ${{ steps.meta.outputs.artifact-name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Set up Java (required for Android tooling)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK + NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK ${{ env.NDK_VERSION }}
+        run: |
+          sdkmanager "ndk;${{ env.NDK_VERSION }}"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli --locked
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android-${{ env.ANDROID_TARGET }}
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy (host target only — cross-lint is slow)
+        run: cargo clippy -- -D warnings
+
+      # cargo-ndk handles all the cross-compilation linker setup automatically
+      - name: Build Android APK (release)
+        run: |
+          cargo ndk \
+            --target ${{ env.ANDROID_TARGET }} \
+            --platform ${{ env.MIN_SDK }} \
+            -- build --release
+
+      # dx bundle will produce a proper APK when Dioxus mobile is ready;
+      # for now we ship the .so library as an artifact
+      - name: Locate output library
+        id: locate
+        run: |
+          LIB=$(find target -name "libgit_tree.so" | head -1)
+          echo "lib-path=${LIB}" >> "$GITHUB_OUTPUT"
+
+      - name: Set artifact metadata
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "artifact-name=git-tree-android-arm64-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact-name }}
+          path: ${{ steps.locate.outputs.lib-path }}
+          retention-days: 7
+          if-no-files-found: warn
+          # warn not error — Android support is in-progress (v1.0 roadmap)

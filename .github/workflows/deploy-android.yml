@@ -1,0 +1,165 @@
+name: Deploy — Android
+
+# NOTE: Android deployment is prepared for v1.0 roadmap.
+# The build produces a .so library today. When Dioxus mobile
+# stabilises, swap the artifact path to the APK output from `dx bundle`.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  BINARY_NAME: git-tree
+
+jobs:
+  # ── 1. Lint (no full test run — Android can't execute desktop tests) ────────
+  lint:
+    name: Lint before deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libgit2-dev pkg-config
+
+      - name: Fmt check
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+
+  # ── 2. Build ───────────────────────────────────────────────────────────────
+  build:
+    needs: lint
+    uses: ./.github/workflows/build-android.yml
+
+  # ── 3. Package + sign ──────────────────────────────────────────────────────
+  package:
+    name: Package Android
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      - name: Rename artifact
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Today: .so library
+          ARTIFACT=$(ls dist/)
+          mv "dist/${ARTIFACT}" "dist/${{ env.BINARY_NAME }}-android-arm64-${VERSION}.so"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          # When APK is ready, rename to:
+          # mv dist/*.apk dist/git-tree-android-arm64-${VERSION}.apk
+
+      - name: Compute SHA256
+        run: |
+          SHA=$(sha256sum dist/*.so | awk '{print $1}')
+          echo "${SHA}  ${{ env.BINARY_NAME }}-android-arm64-${{ env.VERSION }}.so" \
+            > dist/SHA256SUMS-android.txt
+
+      # ── APK signing (uncomment when APK is produced) ───────────────────────
+      # Requires secrets:
+      #   ANDROID_KEYSTORE_BASE64  — base64-encoded .jks file
+      #   ANDROID_KEY_ALIAS        — key alias inside the keystore
+      #   ANDROID_KEY_PASSWORD     — key password
+      #   ANDROID_STORE_PASSWORD   — keystore password
+      #
+      # - name: Decode keystore
+      #   run: |
+      #     echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+      #
+      # - name: Sign APK
+      #   run: |
+      #     apksigner sign \
+      #       --ks keystore.jks \
+      #       --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+      #       --ks-pass "pass:${{ secrets.ANDROID_STORE_PASSWORD }}" \
+      #       --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
+      #       dist/git-tree-android-arm64-${{ env.VERSION }}.apk
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-packaged-${{ github.ref_name }}
+          path: dist/
+          retention-days: 7
+
+  # ── 4. GitHub Release ──────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (Android)
+    needs: [build, package]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-packaged-${{ github.ref_name }}
+          path: dist/
+
+      - name: Build release notes
+        run: |
+          cat > release_notes.txt << 'EOF'
+          ## Android (arm64-v8a) — Early Preview
+
+          > Android support is in-progress (v1.0 roadmap). This artifact is a
+          > native library (`.so`) produced by the cross-compilation pipeline.
+          > A full APK will be released once Dioxus mobile stabilises.
+
+          **Supported ABIs:** arm64-v8a (all modern Android phones)
+          **Minimum SDK:** API 24 (Android 7.0)
+
+          Tested targets include Dimensity 8300-class devices.
+          EOF
+
+      # Same release as Linux/Windows — just adds Android assets
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "git-tree ${{ github.ref_name }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: true   # Android is always pre-release until v1.0
+          files: |
+            dist/${{ env.BINARY_NAME }}-android-arm64-${{ github.ref_name }}.so
+            dist/SHA256SUMS-android.txt
+
+  # ── 5. Google Play (future, when APK is ready) ─────────────────────────────
+  # Requires secrets: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+  #
+  # play-store:
+  #   name: Upload to Google Play (internal track)
+  #   needs: package
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: android-packaged-${{ github.ref_name }}
+  #         path: dist/
+  #     - uses: r0adkll/upload-google-play@v1
+  #       with:
+  #         serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+  #         packageName: com.mahirojv.gittree
+  #         releaseFiles: dist/*.apk
+  #         track: internal

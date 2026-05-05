@@ -1,0 +1,120 @@
+name: Deploy — Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  BINARY_NAME: git-tree
+
+jobs:
+  # ── 1. Tests ───────────────────────────────────────────────────────────────
+  test:
+    uses: ./.github/workflows/test.yml
+
+  # ── 2. Build ───────────────────────────────────────────────────────────────
+  build:
+    needs: test
+    uses: ./.github/workflows/build-windows.yml
+
+  # ── 3. Package — .exe + optional MSI installer ─────────────────────────────
+  package:
+    name: Package Windows
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          mv "dist/${{ env.BINARY_NAME }}.exe" \
+             "dist/${{ env.BINARY_NAME }}-windows-x86_64.exe"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Compute SHA256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "dist\${{ env.BINARY_NAME }}-windows-x86_64.exe" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ env.BINARY_NAME }}-windows-x86_64.exe" | Out-File -FilePath "dist\SHA256SUMS-windows.txt"
+          echo "WIN_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ── Optional MSI via cargo-wix ─────────────────────────────────────────
+      # Uncomment when you're ready for a proper installer.
+      # Requires a WiX toolset license file at wix/main.wxs (run `cargo wix init` locally first).
+      #
+      # - name: Install cargo-wix
+      #   run: cargo install cargo-wix --locked
+      #
+      # - name: Build MSI installer
+      #   run: cargo wix --output dist\git-tree-${{ github.ref_name }}-x86_64.msi
+      #   env:
+      #     OPENSSL_STATIC: "1"
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-packaged-${{ github.ref_name }}
+          path: dist/
+          retention-days: 7
+
+  # ── 4. GitHub Release ──────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (Windows)
+    needs: [build, package]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-packaged-${{ github.ref_name }}
+          path: dist/
+
+      - name: Build release notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[?${VERSION#v}\]?/{found=1; next} found && /^## /{exit} found{print}" \
+              CHANGELOG.md > release_notes.txt
+          fi
+          if [ ! -s release_notes.txt ]; then
+            cat > release_notes.txt << 'EOF'
+          ## Windows Installation
+
+          1. Download `git-tree-windows-x86_64.exe`
+          2. Run it — Windows Defender may show a SmartScreen warning on first run
+             (the binary is unsigned). Click **More info → Run anyway**.
+          3. No installation required. Move to any folder you like.
+
+          **Requirements:** Windows 10 or 11 (WebView2 is pre-installed on both).
+          EOF
+          fi
+
+      # softprops/action-gh-release will UPDATE an existing release if one was
+      # already created by deploy-linux.yml for the same tag, adding the Windows
+      # assets alongside the Linux ones.
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "git-tree ${{ github.ref_name }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/${{ env.BINARY_NAME }}-windows-x86_64.exe
+            dist/SHA256SUMS-windows.txt
