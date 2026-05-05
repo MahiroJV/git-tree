@@ -43,13 +43,15 @@ pub fn App() -> Element {
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
+        let zoom = use_memo(move || format!("{:.3}", *font_size.read() as f64 / 13.0));
         format!(
             ":root {{ \
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
                 --text-muted:{tm}; --accent:{ac}; --border:{bo}; \
                 --success:{su}; --danger:{da}; \
                 --font-size:{fs}px; \
-            }}",
+            }} \
+            html {{ zoom: {zoom:.3}; }}",
             bg = t.bg,
             bgs = t.bg_secondary,
             text = t.text,
@@ -59,12 +61,9 @@ pub fn App() -> Element {
             su = t.success,
             da = t.danger,
             fs = fs,
+            zoom = zoom,
         )
     });
-
-    // Scale the whole UI proportionally rather than fighting with every
-    // hardcoded font-size declaration in CSS.
-    let zoom = use_memo(move || format!("{:.3}", *font_size.read() as f64 / 13.0));
 
     rsx! {
         style { "{BASE_CSS}" }
@@ -72,7 +71,7 @@ pub fn App() -> Element {
 
         div {
             class: "app-root",
-            style: "zoom: {zoom};",
+            //style: "zoom: {zoom};",
 
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }
