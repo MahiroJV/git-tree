@@ -1,14 +1,25 @@
 <div align="center">
- <img src="assets/icon/icon.svg" height="256" alt="gittree logo">
- <h1 align="center" style="border:0;">git-tree</h1>
+  <img src="assets/icon/icon.svg" height="256" alt="git-tree logo" />
+  <h1>git-tree</h1>
+
+  <p><i>Terminal-style git branch visualizer — built with Rust + Dioxus</i></p>
+
+  <p>
+   <img src="https://img.shields.io/github/actions/workflow/status/MahiroJV/git-tree/test.yml?label=CI%2FCD&logo=githubactions" />
+   <img src="https://img.shields.io/badge/Rust-1.75+-orange" />
+   <img src="https://img.shields.io/badge/Dioxus-UI_Framework-purple?style=flat&logo=rust" />
+   <img src="https://img.shields.io/badge/Built%20with-Claude-CC785C?style=flat&logo=anthropic&logoColor=white" alt="Built with Claude">
+   <br> 
+   <img src="https://img.shields.io/badge/Linux-E11837?style=flat&logo=linux&logoColor=white" alt="Linux">
+   <img src="https://img.shields.io/badge/Linux-supported-orange" />
+   <img src="https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white" alt="Windows">   
+   <img src="https://img.shields.io/badge/Windows-supported-blue" />
+   <br>
+   <img src="https://img.shields.io/crates/v/git-tree-viz?style=flat&color=orange" alt="crates.io"> 
+   <img src="https://img.shields.io/badge/License-MIT-green" />
+   <img src="https://img.shields.io/github/repo-size/MahiroJV/git-tree?style=flat&color=blue" alt="size">
+  </p>
 </div>
-
-> Terminal-style git branch visualizer — built with Rust + Dioxus
-
-![version](https://img.shields.io/badge/version-0.2.0-9B5DE5?style=flat-square)
-![rust](https://img.shields.io/badge/rust-1.75+-orange?style=flat-square)
-![platform](https://img.shields.io/badge/platform-linux-blue?style=flat-square)
-![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
 ---
 
