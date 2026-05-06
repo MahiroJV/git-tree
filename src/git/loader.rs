@@ -7,21 +7,22 @@ use crate::git::parser::{parse_repo, RepoTree};
 
 /// Load from a local folder path
 pub fn load_local(path: &Path) -> Result<RepoTree> {
-    let path = path.owned();
+    let path = path.to_owned();
     std::thread::Builder::new()
-        .stack_size(32 * 1024*1024)
+        .stack_size(32 * 1024 * 1024)
         .spawn(move || {
-            let repo =
-            Repository::open(path).with_context(|| format!("Failed to open repo at {:?}", path))?;
+            let repo = Repository::open(&path)
+                .with_context(|| format!("Failed to open repo at {:?}", path))?;
             parse_repo(&repo)
         })
-        .comtext("Failed to spawn git thread")?
+        .context("Failed to spawn git thread")?
         .join()
-        .map_err(|_| anyhow::anyhow!(
-            "Repository processing crashed (libgit2 stack overflow).\n\
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Repository processing crashed (libgit2 stack overflow).\n\
              Fix: run  git config --global core.autocrlf false  then retry."
-        ))?
-    
+            )
+        })?
 }
 
 pub fn load_remote(url: &str) -> Result<RepoTree> {
@@ -37,7 +38,7 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
         .to_string();
     let url = url.to_owned();
 
-      std::thread::Builder::new()
+    std::thread::Builder::new()
         .stack_size(32 * 1024 * 1024)
         .spawn(move || {
             let clone_path = temp_dir.join(&folder_name);
@@ -54,10 +55,12 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
         })
         .context("Failed to spawn git thread")?
         .join()
-        .map_err(|_| anyhow::anyhow!(
-            "Repository processing crashed (libgit2 stack overflow).\n\
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Repository processing crashed (libgit2 stack overflow).\n\
              Fix: run  git config --global core.autocrlf false  then retry."
-        ))?
+            )
+        })?
 }
 
 /// Fetch + pull latest changes for an already-loaded repo
