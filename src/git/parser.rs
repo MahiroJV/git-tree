@@ -141,11 +141,14 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
 
         // ── Diff ────────────────────────────────────────────────────────────
         let commit_tree = commit.tree()?;
+        let mut diff_opts = git2::DiffOPtions::new();
+        diff_opts.ignore_whitespace_eol(true).context_lines(3).include_untracked(false);
+        
         let diff = if let Some(parent) = commit.parents().next() {
             let parent_tree = parent.tree()?;
-            repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), None)?
+            repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), Some(&mut diff_opts)?
         } else {
-            repo.diff_tree_to_tree(None, Some(&commit_tree), None)?
+            repo.diff_tree_to_tree(None, Some(&commit_tree), Some(&mut diff_opts))?
         };
 
         let mut files_changed: Vec<FileChange> = Vec::new();
