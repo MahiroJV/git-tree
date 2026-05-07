@@ -39,11 +39,12 @@ pub fn App() -> Element {
     let mut crt_overlay = use_signal(|| false);
     let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
     let mut branch_style = use_signal(|| BranchStyle::Curved);
+    let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
 
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
-        let zoom = use_memo(move || format!("{:.3}", *font_size.read() as f64 / 13.0));
+        let z = *zoom.read();
         format!(
             ":root {{ \
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
@@ -61,7 +62,6 @@ pub fn App() -> Element {
             su = t.success,
             da = t.danger,
             fs = fs,
-            zoom = zoom,
         )
     });
 
