@@ -44,7 +44,7 @@ pub fn App() -> Element {
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
-        let z = *zoom.read();
+        let _z = *zoom.read();
         format!(
             ":root {{ \
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
