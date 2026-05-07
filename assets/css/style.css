@@ -11,6 +11,87 @@
     font-weight: 400;
     src: url('../fonts/SpaceMono-Regular.woff2') format('woff2');
 }
+/* ── Node pulse animation ── */
+@keyframes node-pulse {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    60%  { transform: scale(2.8); opacity: 0.2; }
+    100% { transform: scale(3.5); opacity: 0; }
+}
+
+.node-pulse-ring {
+    animation: node-pulse 0.6s ease-out forwards;
+    transform-origin: center;
+    transform-box: fill-box;  /* makes scale() work from circle center in SVG */
+    pointer-events: none;
+}
+
+/* ── Branch line draw-in ── */
+@keyframes line-draw {
+    from { stroke-dashoffset: 9999; opacity: 0; }
+    to   { stroke-dashoffset: 0;    opacity: 1; }
+}
+
+.branch-line-animated {
+    stroke-dasharray: 9999;
+    animation: line-draw 0.9s ease-out forwards;
+}
+
+.spine-animated {
+    stroke-dasharray: 9999;
+    animation: line-draw 1.0s ease-out forwards;
+}
+
+/* ── Panel slide-in ── */
+@keyframes slide-in-left {
+    from { transform: translateX(-100%); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes slide-in-right {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Loading bar ── */
+@keyframes loading-fill {
+    0%   { width: 0%;  }
+    20%  { width: 32%; }
+    50%  { width: 61%; }
+    80%  { width: 83%; }
+    100% { width: 94%; }
+}
+
+@keyframes shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(300%);  }
+}
+
+.loading-bar-wrap {
+    width: 320px;
+    height: 1px;
+    background: rgba(155, 93, 229, 0.2);
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.loading-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    animation: loading-fill 4s ease-out forwards;
+    position: relative;
+    overflow: hidden;
+}
+
+.loading-bar-shimmer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s ease-in-out infinite;
+}
 
 :root {
     --bg: #000000;
@@ -129,11 +210,16 @@ html, body, #main {
     height: 100%;
     min-width: 0;
 }
-.panel-left  { border-right: 1px solid var(--border); }
+.panel-left  {
+    border-right: 1px solid var(--border);
+    overflow-x: hidden;
+    animation: slide-in-left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
 .panel-right {
     width: var(--panel-width);
     position: relative;
     transition: transform 0.3s ease;
+    animation: slide-in-right 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
 .panel-right.collapsed {
@@ -707,7 +793,9 @@ html, body, #main {
 .commit-message-box,
 .diff-file-path,
 .diff-file-row,
-.recent-item-path
+.recent-item-path {
+    font-size: var(--font-size, 13px);
+}
     /* ═══════════════════════════════════════════════════════════════════════════
        SEARCH ONLINE — results list
        ═══════════════════════════════════════════════════════════════════════════ */

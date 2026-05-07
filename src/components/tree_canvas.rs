@@ -34,14 +34,7 @@ pub enum TreeDirection {
 /// Controls how branch connector lines are drawn.
 #[derive(Clone, PartialEq, Debug)]
 pub enum BranchStyle {
-    /// Smooth cubic-bezier S-curves, node at peak.
     Curved,
-    /// Flat-top trapezoid with a centred node:
-    ///
-    ///   Horizontal:   ───/──●──\───
-    ///   Vertical:     |
-    ///                 ├──●──┤
-    ///                 |
     Geometric,
 }
 
@@ -372,6 +365,7 @@ pub fn TreeCanvas(
                     // ── Main spine ────────────────────────────────────────
                     if is_vertical {
                         line {
+                            class: "spine-animated",
                             x1: "{V_H_MAIN}", y1: "40",
                             x2: "{V_H_MAIN}", y2: "{canvas_height - 40.0}",
                             stroke: "var(--accent)", stroke_width: "2",
@@ -379,6 +373,7 @@ pub fn TreeCanvas(
                         }
                     } else {
                         line {
+                            class: "spine-animated",
                             x1: "40",
                             y1: "{H_V_MAIN}",
                             x2: "{canvas_width - 40.0}",
@@ -389,9 +384,10 @@ pub fn TreeCanvas(
                     }
 
                     // ── Branch connectors ─────────────────────────────────
-                    for (commit, x, y, matches) in &positioned {
+                    for (idx,(commit, x, y, matches)) in positioned.iter().enumerate() {
                         if commit.is_merge {
                             {
+                                let delay = format!("animation-delay: {}ms", idx * 35);
                                 let opacity = if search_query.is_empty() || *matches {
                                     "1"
                                 } else {
@@ -400,17 +396,6 @@ pub fn TreeCanvas(
                                 let color = commit.color.clone();
 
                                 if is_geometric {
-                                    // ─────────────────────────────────────────
-                                    // GEOMETRIC — flat-top trapezoid
-                                    //
-                                    // Three path segments per merge node:
-                                    //
-                                    //  d_approach: ───/   (flat at main, diagonal up to flat-top left edge)
-                                    //  d_flat:     ──●──  (horizontal flat top, node at centre)
-                                    //  d_leave:    \───   (diagonal down from flat-top right edge, flat at main)
-                                    //
-                                    // Vertical equivalent rotated 90°.
-                                    // ─────────────────────────────────────────
                                     let (d_approach, d_flat, d_leave) = if is_vertical {
                                         // flat-top is vertical: a short vertical segment at x,
                                         // centred on y
@@ -435,16 +420,22 @@ pub fn TreeCanvas(
 
                                     rsx! {
                                         path {
+                                            class: "branch-line-animated",
+                                            style: "{delay}",
                                             d: "{d_approach}",
                                             stroke: "{color}", stroke_width: "1.5",
                                             fill: "none", opacity: "{opacity}",
                                         }
                                         path {
+                                            class: "branch-line-animated",
+                                            style: "{delay}",
                                             d: "{d_flat}",
                                             stroke: "{color}", stroke_width: "1.5",
                                             fill: "none", opacity: "{opacity}",
                                         }
                                         path {
+                                            class: "branch-line-animated",
+                                            style: "{delay}",
                                             d: "{d_leave}",
                                             stroke: "{color}", stroke_width: "1.5",
                                             fill: "none", opacity: "{opacity}",
@@ -467,11 +458,15 @@ pub fn TreeCanvas(
                                     };
                                     rsx! {
                                         path {
+                                            class: "branch-line-animated",
+                                            style: "{delay}",
                                             d: "{d_in}",
                                             stroke: "{color}", stroke_width: "1.5",
                                             fill: "none", opacity: "{opacity}",
                                         }
                                         path {
+                                            class: "branch-line-animated",
+                                            style: "{delay}",
                                             d: "{d_out}",
                                             stroke: "{color}", stroke_width: "1.5",
                                             fill: "none", opacity: "{opacity}",
@@ -511,6 +506,7 @@ fn CommitDot(
     dimmed: bool,
     on_click: EventHandler<CommitNode>,
 ) -> Element {
+    let mut click_id = use_signal(||  0_u32);
     let color = commit.color.clone();
     let fill = if selected {
         color.clone()
@@ -530,13 +526,31 @@ fn CommitDot(
     rsx! {
         g {
             style: "cursor: pointer; opacity: {opacity};",
-            onclick: move |_| { if !dimmed { on_click.call(c.clone()); } },
+            onclick: move |_| {
+                if !dimmed {
+                    on_click.call(c.clone());
+                    click_id += 1
+                }
+            },
+
+            if selected {
+                circle {
+                    key: "pulse-{click_id}",
+                    class: "node-pulse-ring",
+                    cx: "{x}", cy: "{y}", r: "{NODE_RADIUS}",
+                    fill: "none",
+                    stroke: "{color}",
+                    stroke_width: "1",
+                }
+            }
 
             if selected {
                 circle {
                     cx: "{x}", cy: "{y}", r: "{NODE_RADIUS + 6.0}",
-                    fill: "none", stroke: "{color}",
-                    stroke_width: "1", opacity: "0.25"
+                    fill: "none",
+                    stroke: "{color}",
+                    stroke_width: "1",
+                    opacity: "0.25"
                 }
             }
 

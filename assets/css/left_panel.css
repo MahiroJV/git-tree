@@ -29,10 +29,19 @@
     padding: 0 14px 6px;
     word-break: break-all;
     line-height: 1.5;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .commit-field-value--accent {
     color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-right: 14px;
 }
 
 .commit-hash-row {
