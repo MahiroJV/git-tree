@@ -1,9 +1,8 @@
 // git/loader.rs — Open a local repo or clone a remote one
+use crate::git::parser::{load_diff_for_commit, parse_repo, RepoTree};
 use anyhow::{Context, Result};
 use git2::{build::RepoBuilder, FetchOptions, Repository};
 use std::path::Path;
-
-use crate::git::parser::{parse_repo, RepoTree};
 
 /// Load from a local folder path
 pub fn load_local(path: &Path) -> Result<RepoTree> {
@@ -61,6 +60,28 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
              Fix: run  git config --global core.autocrlf false  then retry."
             )
         })?
+}
+
+pub fn load_commit_diff(
+    path: &Path,
+    hash: &str,
+) -> Result<(
+    Vec<crate::git::parser::FileChange>,
+    crate::git::parser::DiffStats,
+)> {
+    let path = path.to_owned();
+    let hash = hash.to_owned();
+
+    std::thread::Builder::new()
+        .stack_size(32 * 1024 * 1024)
+        .spawn(move || {
+            let repo = Repository::open(&path)
+                .with_context(|| format!("Failed to open repo at {:?}", path))?;
+            load_diff_for_commit(&repo, &hash)
+        })
+        .context("Failed to spawn diff thread")?
+        .join()
+        .map_err(|_| anyhow::anyhow!("Diff loading crashed"))?
 }
 
 /// Fetch + pull latest changes for an already-loaded repo

@@ -7,6 +7,7 @@ use crate::components::{
     toolbar::Toolbar,
     tree_canvas::{BranchStyle, TreeCanvas, TreeDirection},
 };
+use crate::git::loader::load_commit_diff;
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use crate::theme::theme_by_name;
@@ -40,6 +41,16 @@ pub fn App() -> Element {
     let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
     let mut branch_style = use_signal(|| BranchStyle::Curved);
     let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
+    let mut diff_loading = use_signal(|| false);
+    let mut diff_cache: Signal<
+        std::collections::HashMap<
+            String,
+            (
+                Vec<crate::git::parser::FileChange>,
+                crate::git::parser::DiffStats,
+            ),
+        >,
+    > = use_signal(std::collections::HashMap::new);
 
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
@@ -140,6 +151,8 @@ pub fn App() -> Element {
                                     commit:    selected_commit.read().clone(),
                                     open:      *left_open.read(),
                                     on_toggle: move |_| left_open.set(!left_open()),
+                                    remote_url: repo_tree.read().as_ref()
+                                        .and_then(|r| r.remote_url.clone()),
                                 }
 
                                 TreeCanvas {
@@ -152,7 +165,54 @@ pub fn App() -> Element {
                                     direction:     tree_direction.read().clone(),
                                     branch_style:  branch_style.read().clone(),
                                     on_select:     move |commit: CommitNode| {
-                                        selected_commit.set(Some(commit))
+                                        let hash = commit.hash.clone();
+                                        // Show commit metadata immediately
+                                        selected_commit.set(Some(commit.clone()));
+
+                                        // Return early if diff already cached
+                                        if diff_cache.read().contains_key(&hash) {
+                                            let (files, stats) = diff_cache.read()[&hash].clone();
+                                            let mut c = commit.clone();
+                                            c.files_changed = files;
+                                            c.stats = stats;
+                                            selected_commit.set(Some(c));
+                                            return;
+                                        }
+
+                                        // Lazy load diff in background
+                                        diff_loading.set(true);
+                                        let repo_path = repo_tree.read().as_ref()
+                                            .and_then(|r| r.repo_path.clone());
+
+                                        spawn(async move {
+                                            if let Some(path) = repo_path {
+                                                let (tx, rx) = tokio::sync::oneshot::channel();
+                                                let h = hash.clone();
+                                                std::thread::spawn(move || {
+                                                    let _ = tx.send(load_commit_diff(&path, &h));
+                                                });
+
+                                                if let Ok(Ok((files, stats))) = rx.await {
+                                                    diff_cache.write().insert(
+                                                        hash.clone(),
+                                                        (files.clone(), stats.clone())
+                                                    );
+                                                    let still_selected = selected_commit.read()
+                                                        .as_ref()
+                                                        .map(|c| c.hash == hash).unwrap_or(false);
+
+                                                    if still_selected {
+                                                        let maybe_c = selected_commit.read().clone();
+                                                        if let Some(mut c) = maybe_c {
+                                                            c.files_changed = files;
+                                                            c.stats = stats;
+                                                            selected_commit.set(Some(c));
+                                                        }
+                                                    }
+                                                }
+                                            diff_loading.set(false);
+                                            }
+                                        });
                                     },
                                     on_deselect:   move |_| selected_commit.set(None),
                                 }
@@ -161,6 +221,7 @@ pub fn App() -> Element {
                                     commit:       selected_commit.read().clone(),
                                     open:         *right_open.read(),
                                     on_toggle:    move |_| right_open.set(!right_open()),
+                                    diff_loading: *diff_loading.read(),
                                     on_view_diff: move |commit: CommitNode| {
                                         screen.set(Screen::Diff(Box::new(commit)))
                                     },

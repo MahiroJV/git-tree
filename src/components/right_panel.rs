@@ -10,6 +10,7 @@ pub fn RightPanel(
     open: bool,
     on_toggle: EventHandler<()>,
     on_view_diff: EventHandler<CommitNode>,
+    diff_loading: bool,
 ) -> Element {
     // ── Collapsed state — thin strip ──────────────────────────────────────
     if !open {

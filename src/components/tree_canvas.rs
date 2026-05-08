@@ -506,7 +506,7 @@ fn CommitDot(
     dimmed: bool,
     on_click: EventHandler<CommitNode>,
 ) -> Element {
-    let mut click_id = use_signal(||  0_u32);
+    let mut click_id = use_signal(|| 0_u32);
     let color = commit.color.clone();
     let fill = if selected {
         color.clone()

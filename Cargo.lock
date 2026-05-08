@@ -2044,6 +2044,7 @@ dependencies = [
  "toml",
  "urlencoding",
  "web-sys",
+ "webbrowser",
 ]
 
 [[package]]

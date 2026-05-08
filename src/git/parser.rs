@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use git2::{Patch, Repository};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 // ─── Core Data Structures ────────────────────────────────────────────────────
 
@@ -86,23 +87,22 @@ pub struct RepoTree {
     pub repo_name: String,
     pub remote_url: Option<String>,
     pub total_contributors: usize,
+    pub repo_path: Option<PathBuf>,
+    pub truncated: bool,
 }
 
 // ─── Limits ──────────────────────────────────────────────────────────────────
 
-/// Max diff lines stored per file (avoids memory blowout on large files)
+const MAX_COMMITS: usize = 500;
 const MAX_LINES_PER_FILE: usize = 80;
-/// Max total diff lines stored per commit across all files
 const MAX_LINES_PER_COMMIT: usize = 300;
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
 pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
     let mut walk = repo.revwalk()?;
-
     walk.push_head()?;
 
-    // Also walk all local branches
     #[allow(clippy::manual_flatten)]
     for branch in repo.branches(Some(git2::BranchType::Local))? {
         if let Ok((branch, _)) = branch {
@@ -111,14 +111,11 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             }
         }
     }
-
-    // Oldest → newest so the tree reads left-to-right chronologically
     walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME | git2::Sort::REVERSE)?;
 
     let mut commits: Vec<CommitNode> = Vec::new();
     let head_id = repo.head().ok().and_then(|h| h.target());
 
-    // Collect all tags for quick lookup
     let mut tag_map: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     repo.tag_foreach(|oid, name| {
@@ -130,112 +127,28 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         true
     })?;
 
+    let mut total_walked = 0usize;
+
     for oid in walk {
+        // ── Commit cap ──────────────────────────────────────────────────
+        if commits.len() >= MAX_COMMITS {
+            total_walked += 1;
+            continue; // keep counting but don't parse
+        }
+
         let oid = oid?;
         let commit = repo.find_commit(oid)?;
+        total_walked += 1;
 
         let author = commit.author();
         let author_name = author.name().unwrap_or("Unknown").to_string();
         let author_email = author.email().unwrap_or("").to_string();
         let color = contributor_color(&author_email).to_string();
 
-        // ── Diff ────────────────────────────────────────────────────────────
-        let commit_tree = commit.tree()?;
-        let mut diff_opts = git2::DiffOptions::new();
-        diff_opts
-            .ignore_whitespace_eol(true)
-            .context_lines(3)
-            .include_untracked(false);
-
-        let diff = if let Some(parent) = commit.parents().next() {
-            let parent_tree = parent.tree()?;
-            repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), Some(&mut diff_opts))?
-        } else {
-            repo.diff_tree_to_tree(None, Some(&commit_tree), Some(&mut diff_opts))?
-        };
-
-        let mut files_changed: Vec<FileChange> = Vec::new();
-        let mut total_lines_collected: usize = 0;
-
-        for (delta_idx, delta) in diff.deltas().enumerate() {
-            let path = delta
-                .new_file()
-                .path()
-                .or_else(|| delta.old_file().path())
-                .and_then(|p| p.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let status = match delta.status() {
-                git2::Delta::Added => ChangeStatus::Added,
-                git2::Delta::Deleted => ChangeStatus::Deleted,
-                git2::Delta::Renamed => ChangeStatus::Renamed,
-                _ => ChangeStatus::Modified,
-            };
-
-            // Collect actual diff lines via Patch
-            let mut diff_lines: Vec<DiffLine> = Vec::new();
-            let mut file_additions: usize = 0;
-            let mut file_deletions: usize = 0;
-
-            if total_lines_collected < MAX_LINES_PER_COMMIT {
-                if let Ok(Some(patch)) = Patch::from_diff(&diff, delta_idx) {
-                    let num_hunks = patch.num_hunks();
-                    'outer: for hunk_idx in 0..num_hunks {
-                        let num_lines = patch.num_lines_in_hunk(hunk_idx).unwrap_or(0);
-                        for line_idx in 0..num_lines {
-                            if let Ok(line) = patch.line_in_hunk(hunk_idx, line_idx) {
-                                let origin = line.origin();
-                                match origin {
-                                    '+' => file_additions += 1,
-                                    '-' => file_deletions += 1,
-                                    _ => {}
-                                }
-                                // Only store +/- and context lines (skip hunk headers etc.)
-                                if matches!(origin, '+' | '-' | ' ') {
-                                    if diff_lines.len() < MAX_LINES_PER_FILE
-                                        && total_lines_collected < MAX_LINES_PER_COMMIT
-                                    {
-                                        let content = std::str::from_utf8(line.content())
-                                            .unwrap_or("")
-                                            .trim_end_matches('\n')
-                                            .trim_end_matches('\r')
-                                            .to_string();
-                                        diff_lines.push(DiffLine { origin, content });
-                                        total_lines_collected += 1;
-                                    } else {
-                                        break 'outer;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            files_changed.push(FileChange {
-                path,
-                additions: file_additions,
-                deletions: file_deletions,
-                status,
-                lines: diff_lines,
-            });
-        }
-
-        // Overall stats from git2's built-in counter
-        let diff_stats = diff.stats()?;
-        let stats = DiffStats {
-            files_changed: diff_stats.files_changed(),
-            insertions: diff_stats.insertions(),
-            deletions: diff_stats.deletions(),
-        };
-        // ── End diff ────────────────────────────────────────────────────────
-
         let hash = oid.to_string();
         let short_hash = hash[..7].to_string();
         let message_full = commit.message().unwrap_or("").to_string();
         let message = message_full.lines().next().unwrap_or("").to_string();
-
         let timestamp = DateTime::from_timestamp(commit.time().seconds(), 0).unwrap_or_default();
         let parent_hashes: Vec<String> = commit.parents().map(|p| p.id().to_string()).collect();
         let is_merge = parent_hashes.len() > 1;
@@ -254,13 +167,14 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             is_merge,
             is_head,
             tags,
-            files_changed,
-            stats,
+            files_changed: Vec::new(),   // ← empty — loaded lazily on click
+            stats: DiffStats::default(), // ← empty
             branch_name: None,
             hash,
         });
     }
 
+    let truncated = total_walked > MAX_COMMITS;
     let branches = build_branch_lines(&commits);
     let main_branch = branches
         .first()
@@ -274,6 +188,7 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         .unwrap_or("")
         .to_string();
 
+    let repo_path = repo.workdir().map(|p| p.to_path_buf());
     let remote_url = repo
         .find_remote("origin")
         .ok()
@@ -292,7 +207,98 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         repo_name,
         remote_url,
         total_contributors,
+        repo_path,
+        truncated,
     })
+}
+
+/// Load diff for a single commit — called lazily when user clicks a node
+pub fn load_diff_for_commit(repo: &Repository, hash: &str) -> Result<(Vec<FileChange>, DiffStats)> {
+    let oid = git2::Oid::from_str(hash)?;
+    let commit = repo.find_commit(oid)?;
+
+    let commit_tree = commit.tree()?;
+    let mut diff_opts = git2::DiffOptions::new();
+    diff_opts.ignore_whitespace_eol(true).context_lines(3);
+
+    let diff = if let Some(parent) = commit.parents().next() {
+        let parent_tree = parent.tree()?;
+        repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit_tree), Some(&mut diff_opts))?
+    } else {
+        repo.diff_tree_to_tree(None, Some(&commit_tree), Some(&mut diff_opts))?
+    };
+
+    let mut files_changed: Vec<FileChange> = Vec::new();
+    let mut total_lines = 0usize;
+
+    for (delta_idx, delta) in diff.deltas().enumerate() {
+        let path = delta
+            .new_file()
+            .path()
+            .or_else(|| delta.old_file().path())
+            .and_then(|p| p.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let status = match delta.status() {
+            git2::Delta::Added => ChangeStatus::Added,
+            git2::Delta::Deleted => ChangeStatus::Deleted,
+            git2::Delta::Renamed => ChangeStatus::Renamed,
+            _ => ChangeStatus::Modified,
+        };
+
+        let mut diff_lines: Vec<DiffLine> = Vec::new();
+        let mut file_adds = 0usize;
+        let mut file_dels = 0usize;
+
+        if total_lines < MAX_LINES_PER_COMMIT {
+            if let Ok(Some(patch)) = Patch::from_diff(&diff, delta_idx) {
+                'outer: for hunk_idx in 0..patch.num_hunks() {
+                    for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+                        if let Ok(line) = patch.line_in_hunk(hunk_idx, line_idx) {
+                            let origin = line.origin();
+                            match origin {
+                                '+' => file_adds += 1,
+                                '-' => file_dels += 1,
+                                _ => {}
+                            }
+                            if matches!(origin, '+' | '-' | ' ')
+                                && diff_lines.len() < MAX_LINES_PER_FILE
+                                && total_lines < MAX_LINES_PER_COMMIT
+                            {
+                                let content = std::str::from_utf8(line.content())
+                                    .unwrap_or("")
+                                    .trim_end_matches('\n')
+                                    .trim_end_matches('\r')
+                                    .to_string();
+                                diff_lines.push(DiffLine { origin, content });
+                                total_lines += 1;
+                            } else if total_lines >= MAX_LINES_PER_COMMIT {
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        files_changed.push(FileChange {
+            path,
+            additions: file_adds,
+            deletions: file_dels,
+            status,
+            lines: diff_lines,
+        });
+    }
+
+    let raw_stats = diff.stats()?;
+    let stats = DiffStats {
+        files_changed: raw_stats.files_changed(),
+        insertions: raw_stats.insertions(),
+        deletions: raw_stats.deletions(),
+    };
+
+    Ok((files_changed, stats))
 }
 
 fn build_branch_lines(commits: &[CommitNode]) -> Vec<BranchLine> {

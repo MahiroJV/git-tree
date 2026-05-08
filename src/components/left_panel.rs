@@ -1,4 +1,5 @@
 use crate::git::parser::CommitNode;
+use crate::git::url::commit_web_url;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
@@ -6,7 +7,12 @@ const PANEL_SHARED_CSS: &str = include_str!("../../assets/css/panel_shared.css")
 const LEFT_PANEL_CSS: &str = include_str!("../../assets/css/left_panel.css");
 
 #[component]
-pub fn LeftPanel(commit: Option<CommitNode>, open: bool, on_toggle: EventHandler<()>) -> Element {
+pub fn LeftPanel(
+    commit: Option<CommitNode>,
+    open: bool,
+    on_toggle: EventHandler<()>,
+    remote_url: Option<String>,
+) -> Element {
     // ── Collapsed state — thin strip ──────────────────────────────────────
     if !open {
         return rsx! {
@@ -92,6 +98,19 @@ pub fn LeftPanel(commit: Option<CommitNode>, open: bool, on_toggle: EventHandler
                         eval(&format!("navigator.clipboard.writeText('{full_hash}')"));
                     },
                     "⊞"
+                }
+            }
+
+            if let Some(web_url) = remote_url.as_ref()
+                .and_then(|r| commit_web_url(r, &commit.hash))
+            {
+                button {
+                    class: "copy-hash-btn",
+                    title: "Open in browser",
+                    onclick: move |_|  {
+                        let _ = webbrowser::open(&web_url);
+                    },
+                    "Check in Github.com ↗"
                 }
             }
 
