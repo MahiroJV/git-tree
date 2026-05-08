@@ -209,9 +209,9 @@ dx build --platform desktop --release
 - [ ] Minimap (corner overview of the full tree)
 - [ ] Repo stats (contributor leaderboard + commit heatmap)
 - [ ] Export tree as SVG or PNG
-- [ ] Open commit in browser (GitHub / GitLab)
-- [ ] Node pulse animation on click
-- [ ] Blame view (per-file line authorship)
+- [x] Open commit in browser (GitHub / GitLab)
+- [x] Node pulse animation on click
+- [x] Blame view (per-file line authorship)
 
 ---
 

@@ -152,6 +152,54 @@ pub const THEMES: &[Theme] = &[
         success: "#34D399",
         danger: "#F87171",
     },
+    //Tokyo Night
+    Theme {
+        name: "Tokyo Night",
+        bg: "#1A1B26",
+        bg_secondary: "#16161E",
+        text: "#C0CAF5",
+        text_muted: "#565F89",
+        accent: "#7AA2F7",
+        border: "#414868",
+        success: "#9ECE6A",
+        danger: "#F7768E",
+    },
+    //Cappuccino Mocha
+    Theme {
+        name: "Cappuccino Mocha",
+        bg: "#1E1E2E",
+        bg_secondary: "#181825",
+        text: "#CDD6F4",
+        text_muted: "#6C7086",
+        accent: "#CBA6F7",
+        border: "#45475A",
+        success: "#A6E3A1",
+        danger: "#F38BA8",
+    },
+    //Rose Pine
+    Theme {
+        name: "Rose Pine",
+        bg: "#191724",
+        bg_secondary: "#1F1D2E",
+        text: "#E0DEF4",
+        text_muted: "#6E6A86",
+        accent: "#C4A7E7",
+        border: "#524F67",
+        success: "#9CCFD8",
+        danger: "#EB6F92",
+    },
+    //Everforest
+    Theme {
+        name: "Everforest",
+        bg: "#2B3339",
+        bg_secondary: "#323C41",
+        text: "#D3C6AA",
+        text_muted: "#7A8478",
+        accent: "#A7C080",
+        border: "#4F5B58",
+        success: "#83C092",
+        danger: "#E67E80",
+    },
 ];
 #[allow(dead_code)]
 pub fn default_theme() -> &'static Theme {
