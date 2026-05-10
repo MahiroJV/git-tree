@@ -3,7 +3,8 @@
 set -e
 
 APP_NAME="git-tree"
-BINARY_NAME="git-tree-linux-x86_64"
+BIN_NAME="git-tree"
+GITHUB_REPO="MahiroJV/git-tree"
 
 INSTALL_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
@@ -12,7 +13,7 @@ ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 echo "== git-tree installer =="
 
 # ─────────────────────────────────────────────
-# Detect distro
+# Detect OS
 # ─────────────────────────────────────────────
 
 if [ -f /etc/arch-release ]; then
@@ -31,98 +32,98 @@ echo "Detected OS: $DISTRO"
 # Install dependencies
 # ─────────────────────────────────────────────
 
-install_arch() {
-    echo "Installing Arch dependencies..."
+install_deps() {
+    echo "Installing dependencies..."
 
-    sudo pacman -Sy --needed \
-        webkit2gtk \
-        libgit2 \
-        xdotool \
-        gtk3 \
-        zlib
+    case "$DISTRO" in
+        arch)
+            sudo pacman -Sy --needed \
+                webkit2gtk \
+                libgit2 \
+                xdotool \
+                gtk3 \
+                zlib
 
-    # libxdo compatibility fix
-    if [ ! -e /usr/lib/libxdo.so.3 ] && [ -e /usr/lib/libxdo.so.4 ]; then
-        echo "Fixing libxdo compatibility..."
-        sudo ln -sf /usr/lib/libxdo.so.4 /usr/lib/libxdo.so.3
-    fi
+            # fix libxdo issue if needed
+            if [ ! -e /usr/lib/libxdo.so.3 ] && [ -e /usr/lib/libxdo.so.4 ]; then
+                sudo ln -sf /usr/lib/libxdo.so.4 /usr/lib/libxdo.so.3
+            fi
+            ;;
+        debian)
+            sudo apt update
+            sudo apt install -y \
+                libwebkit2gtk-4.1-0 \
+                libgtk-3-0 \
+                libxdo3 \
+                libgit2-1.5 \
+                zlib1g
+            ;;
+        fedora)
+            sudo dnf install -y \
+                webkit2gtk4.1 \
+                gtk3 \
+                xdotool \
+                libgit2 \
+                zlib
+            ;;
+        *)
+            echo "Unsupported distro"
+            exit 1
+            ;;
+    esac
 }
 
-install_debian() {
-    echo "Installing Debian/Ubuntu dependencies..."
+install_deps
 
-    sudo apt update
+# ─────────────────────────────────────────────
+# Get latest release
+# ─────────────────────────────────────────────
 
-    sudo apt install -y \
-        libwebkit2gtk-4.1-0 \
-        libgtk-3-0 \
-        libxdo3 \
-        libgit2-1.5 \
-        zlib1g
-}
+echo "Fetching latest release..."
 
-install_fedora() {
-    echo "Installing Fedora dependencies..."
+LATEST=$(curl -s https://api.github.com/repos/$GITHUB_REPO/releases/latest | grep tag_name | cut -d '"' -f4)
 
-    sudo dnf install -y \
-        webkit2gtk4.1 \
-        gtk3 \
-        xdotool \
-        libgit2 \
-        zlib
-}
+if [ -z "$LATEST" ]; then
+    echo "Failed to get latest version"
+    exit 1
+fi
 
-case "$DISTRO" in
-    arch)
-        install_arch
-        ;;
-    debian)
-        install_debian
-        ;;
-    fedora)
-        install_fedora
-        ;;
-    *)
-        echo "Unsupported distro."
-        exit 1
-        ;;
-esac
+echo "Latest version: $LATEST"
+
+DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$LATEST/git-tree-linux-x86_64"
 
 # ─────────────────────────────────────────────
 # Install binary
 # ─────────────────────────────────────────────
 
-echo "Installing binary..."
+echo "Downloading binary..."
 
 mkdir -p "$INSTALL_DIR"
 
-cp "$BINARY_NAME" "$INSTALL_DIR/git-tree"
+curl -L "$DOWNLOAD_URL" -o "$INSTALL_DIR/$BIN_NAME"
 
-chmod +x "$INSTALL_DIR/git-tree"
+chmod +x "$INSTALL_DIR/$BIN_NAME"
 
 # ─────────────────────────────────────────────
 # Install icon
 # ─────────────────────────────────────────────
 
-echo "Installing icon..."
-
 mkdir -p "$ICON_DIR"
 
-cp assets/icon/icon.png \
-   "$ICON_DIR/git-tree.png"
+if [ -f "assets/icon/icon.png" ]; then
+    cp assets/icon/icon.png "$ICON_DIR/git-tree.png"
+fi
 
 # ─────────────────────────────────────────────
-# Create desktop entry
+# Desktop entry
 # ─────────────────────────────────────────────
-
-echo "Creating desktop entry..."
 
 mkdir -p "$DESKTOP_DIR"
 
 cat > "$DESKTOP_DIR/git-tree.desktop" <<EOF
 [Desktop Entry]
 Name=git-tree
-Exec=$INSTALL_DIR/git-tree
+Exec=$INSTALL_DIR/$BIN_NAME
 Icon=git-tree
 Type=Application
 Categories=Development;
@@ -131,11 +132,8 @@ EOF
 
 chmod +x "$DESKTOP_DIR/git-tree.desktop"
 
-# Refresh desktop db
 update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 
 echo ""
-echo "Installation completed!"
-echo ""
-echo "Run with:"
-echo "  git-tree"
+echo "✅ Installation completed!"
+echo "Run: git-tree"
