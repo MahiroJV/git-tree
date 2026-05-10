@@ -9,6 +9,7 @@ pub fn Toolbar(
     on_search: EventHandler<String>,
     on_settings: EventHandler<()>,
     on_refresh: EventHandler<()>,
+    on_stats: EventHandler<()>,
 ) -> Element {
     rsx! {
         nav {
@@ -56,6 +57,11 @@ pub fn Toolbar(
                     class: "toolbar-btn",
                     onclick: move |_| on_refresh.call(()),
                     "[ REFRESH ]"
+                }
+                button {
+                    class: "toolbar-btn",
+                    onclick: move |_| on_stats.call(()),
+                    "[ STATS ]"
                 }
                 button {
                     class: "toolbar-btn toolbar-btn-accent",

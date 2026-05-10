@@ -4,6 +4,7 @@ use crate::components::{
     left_panel::LeftPanel,
     right_panel::RightPanel,
     settings::Settings,
+    stats::StatsScreen,
     toolbar::Toolbar,
     tree_canvas::{BranchStyle, TreeCanvas, TreeDirection},
 };
@@ -21,6 +22,7 @@ pub enum Screen {
     Loading(String),
     Tree,
     Settings,
+    Stats,
     Diff(Box<CommitNode>),
 }
 
@@ -102,6 +104,7 @@ pub fn App() -> Element {
                         },
                         on_settings: move |_| screen.set(Screen::Settings),
                         on_refresh:  move |_| {},
+                        on_stats: move |_| screen.set(Screen::Stats),
                     }
                 },
                 _ => rsx! {}
@@ -255,6 +258,20 @@ pub fn App() -> Element {
                     DiffViewer {
                         commit:  *commit.clone(),
                         on_back: move |_| screen.set(Screen::Tree),
+                    }
+                },
+
+                Screen::Stats => rsx! {
+                    {
+                        let maybe_tree = repo_tree.read().clone();
+                        rsx! {
+                            if let Some(ref tree) = maybe_tree {
+                                StatsScreen {
+                                    tree: tree.clone(),
+                                    on_back: move |_| screen.set(Screen::Tree),
+                                }
+                            }
+                        }
                     }
                 },
             }

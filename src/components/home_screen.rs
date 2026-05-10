@@ -3,8 +3,7 @@ use crate::git::parser::RepoTree;
 use crate::git::search::{fmt_stars, search_github, SearchResult};
 use crate::recent;
 use dioxus::prelude::*;
-#[allow(unused_imports)]
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {
@@ -156,7 +155,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                             onclick: move |_| {
                                 spawn(async move {
                                     if let Some(folder) =
-                                        rfd::AsyncFileDialog::new().pick_folder().await
+                                        AsyncFileDialog::new().pick_folder().await
                                     {
                                         local_path.set(
                                             folder.path().to_string_lossy().to_string()

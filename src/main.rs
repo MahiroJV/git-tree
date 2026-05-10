@@ -4,14 +4,13 @@ use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 #[allow(unused_imports)]
 use image::load_from_memory;
+use app::App;
 
 mod app;
 mod components;
 mod git;
 mod recent;
 mod theme;
-
-use app::App;
 
 fn main() {
     let icon_bytes = include_bytes!("../assets/icon/icon.png");
