@@ -1,10 +1,10 @@
 #![windows_subsystem = "windows"]
+use app::App;
 use dioxus::desktop::tao::window::Icon;
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 #[allow(unused_imports)]
 use image::load_from_memory;
-use app::App;
 
 mod app;
 mod components;

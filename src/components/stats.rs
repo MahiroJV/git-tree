@@ -31,7 +31,8 @@ pub fn StatsScreen(tree: RepoTree, on_back: EventHandler<()>) -> Element {
         entry.commit_count += 1;
     }
     let mut contributors: Vec<(String, ContributorStat)> = map.into_iter().collect();
-    contributors.sort_by(|a, b| b.1.commit_count.cmp(&a.1.commit_count));
+    contributors.sort_by_key(|b| std::cmp::Reverse(b.1.commit_count));
+    //contributors.sort_by(|a, b| b.1.commit_count.cmp(&a.1.commit_count));
 
     let total_commits = tree.commits.len();
     let max_count = contributors.first().map(|c| c.1.commit_count).unwrap_or(1);
