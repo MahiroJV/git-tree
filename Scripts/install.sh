@@ -55,7 +55,7 @@ install_deps() {
                 libwebkit2gtk-4.1-0 \
                 libgtk-3-0 \
                 libxdo3 \
-                libgit2-1.5 \
+                libgit2-dev \
                 zlib1g
             ;;
         fedora)
