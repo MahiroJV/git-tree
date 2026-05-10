@@ -3,6 +3,11 @@
     <words>
       <w>Everforest</w>
       <w>Gruvbox</w>
+      <w>appimage</w>
+      <w>libgtk</w>
+      <w>librsvg</w>
+      <w>libxdo</w>
+      <w>linuxdeploy</w>
       <w>statsbar</w>
     </words>
   </dictionary>
