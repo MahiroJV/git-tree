@@ -89,9 +89,9 @@ jobs:
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             -e AppDir/usr/bin/${{ env.BINARY_NAME }} \
-            -d AppDir/${{ env.BINARY_NAME }} \
-            -i AppDir/usr/share/icons/hicolor/256x256/apps/${{ env.BINARY_NAME }} \ 
-            --output appimage    
+            -d AppDir/${{ env.BINARY_NAME }}.desktop \
+            -i AppDir/usr/share/icons/hicolor/256x256/apps/${{ env.BINARY_NAME }}.png \
+            --output appimage
           APPIMAGE=$(find . -name "*.AppImage" | grep -v linuxdeploy | head -1)
           mv "$APPIMAGE" dist/${{ env.BINARY_NAME }}-${{ env.VERSION }}-x86_64.AppImage
 
