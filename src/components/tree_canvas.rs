@@ -277,7 +277,9 @@ pub fn TreeCanvas(
     let s_now = *scale.read();
     let ox = *offset_x.read();
     let oy = *offset_y.read();
+    #[allow(clippy::manual_clamp)]
     let vp_x = (-ox * mm_s).max(0.0_f64).min(MINIMAP_W);
+    #[allow(clippy::manual_clamp)]
     let vp_y = (-oy * mm_s).max(0.0_f64).min(MINIMAP_H);
     let vp_w = ((APPROX_VW / s_now) * mm_s).min(MINIMAP_W);
     let vp_h = ((APPROX_VH / s_now) * mm_s).min(MINIMAP_H);
