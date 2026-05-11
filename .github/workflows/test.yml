@@ -105,40 +105,4 @@ jobs:
       #- name: Doc tests
       #  run: cargo test --doc
       #  env:
-        #  OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
-
-  # ── Android lint (no runner execution, fmt + clippy only) ───────────────────
-  lint-android:
-    name: Lint — Android target
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust + Android target
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-          components: rustfmt, clippy
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libgit2-dev \
-            pkg-config
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: lint-android
-
-      - name: Check formatting
-        run: cargo fmt -- --check
-
-      # Clippy against host target is enough to catch logic errors;
-      # cross-clippy for Android requires a full NDK setup which is slow
-      - name: Clippy (host)
-        run: cargo clippy -- -D warnings
+      #  OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
