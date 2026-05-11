@@ -116,4 +116,5 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/${{ env.BINARY_NAME }}-windows-x86_64.exe
+            dist/git-tree-${{ github.ref_name }}-x86_64.msi
             dist/SHA256SUMS-windows.txt
