@@ -48,17 +48,16 @@ jobs:
           "$hash  ${{ env.BINARY_NAME }}-windows-x86_64.exe" | Out-File -FilePath "dist\SHA256SUMS-windows.txt"
           echo "WIN_SHA256=$hash" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      # ── Optional MSI via cargo-wix ─────────────────────────────────────────
-      # Uncomment when you're ready for a proper installer.
-      # Requires a WiX toolset license file at wix/main.wxs (run `cargo wix init` locally first).
-      #
-      # - name: Install cargo-wix
-      #   run: cargo install cargo-wix --locked
-      #
-      # - name: Build MSI installer
-      #   run: cargo wix --output dist\git-tree-${{ github.ref_name }}-x86_64.msi
-      #   env:
-      #     OPENSSL_STATIC: "1"
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-wix
+        run: cargo install cargo-wix --locked
+
+      - name: Build MSI installer
+        run: cargo wix --output dist/git-tree-${{ github.ref_name }}-x86_64.msi
+        env:
+          OPENSSL_STATIC: "1"
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
