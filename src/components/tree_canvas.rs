@@ -19,6 +19,12 @@ const V_H_MAIN: f64 = 300.0;
 const V_H_BRANCH_LEFT: f64 = 175.0;
 const V_H_BRANCH_RIGHT: f64 = 425.0;
 
+// Minimap
+const MINIMAP_W: f64 = 180.0;
+const MINIMAP_H: f64 = 110.0;
+const APPROX_VW: f64 = 850.0;
+const APPROX_VH: f64 = 480.0;
+
 /// Half-width (px) of the flat-top segment in Geometric mode.
 /// The merge node is centred at the midpoint of this segment.
 const FLAT_HALF: f64 = 28.0;
@@ -125,6 +131,7 @@ pub fn TreeCanvas(
     let mut is_dragging = use_signal(|| false);
     let mut drag_sx = use_signal(|| 0.0_f64);
     let mut drag_sy = use_signal(|| 0.0_f64);
+    let mut show_minimap = use_signal(|| true);
 
     let Some(tree) = tree else {
         return rsx! { div { class: "canvas-empty", "> NO REPOSITORY LOADED" } };
@@ -148,10 +155,6 @@ pub fn TreeCanvas(
         ((count as f64 * node_spacing) + 200.0, H_CANVAS_HEIGHT)
     };
 
-    // ── Position each commit ──────────────────────────────────────────────────
-    //
-    // Geometric mode: merge nodes are pushed slightly further away from main so
-    // the flat-top segment is clearly visible.  Curved mode keeps original offsets.
     let positioned: Vec<(CommitNode, f64, f64, bool)> = visible
         .iter()
         .enumerate()
@@ -164,7 +167,6 @@ pub fn TreeCanvas(
                     } else {
                         V_H_BRANCH_RIGHT
                     };
-                    // Geometric: push a little further from spine so flat top is obvious
                     if is_geometric {
                         if i % 2 == 0 {
                             base - 15.0
@@ -204,6 +206,7 @@ pub fn TreeCanvas(
         })
         .collect();
 
+    let mm_positioned = positioned.clone();
     let match_count = if search_query.is_empty() {
         None
     } else {
@@ -269,6 +272,19 @@ pub fn TreeCanvas(
         ),
     };
 
+    // ── Minimap geometry (computed once, reused in rsx!) ──────────────────────
+    let mm_s = (MINIMAP_W / canvas_width).min(MINIMAP_H / canvas_height);
+    let s_now = *scale.read();
+    let ox = *offset_x.read();
+    let oy = *offset_y.read();
+    let vp_x = (-ox * mm_s).max(0.0_f64).min(MINIMAP_W);
+    let vp_y = (-oy * mm_s).max(0.0_f64).min(MINIMAP_H);
+    let vp_w = ((APPROX_VW / s_now) * mm_s).min(MINIMAP_W);
+    let vp_h = ((APPROX_VH / s_now) * mm_s).min(MINIMAP_H);
+
+    let mm_s_click = mm_s;
+    let s_click = s_now;
+
     rsx! {
         div {
             class: "canvas-wrapper",
@@ -299,6 +315,12 @@ pub fn TreeCanvas(
                     },
                     "[ RESET ]"
                 }
+                button {
+                    class: "toolbar-btn",
+                    title: "Toggle Minimap",
+                    onclick: move |_| show_minimap.set(!show_minimap()),
+                    if *show_minimap.read() { "[ MAP ✕ ]" } else { "[ MAP ]" }
+                }
             }
 
             // ── Hint bar ──────────────────────────────────────────────────
@@ -311,6 +333,102 @@ pub fn TreeCanvas(
                 "{hint}"
             }
 
+            if *show_minimap.read() {
+                div {
+                    style: "position: absolute; \
+                    bottom: 36px; left: 12px; \
+                    z-index: 10; \
+                    background: rgba(0,0,0,0.88); \
+                    border: 1px solid var(--border); \
+                    padding: 4px; \
+                    user-select: none;",
+
+                    svg {
+                        width: "{MINIMAP_W}",
+                        height: "{MINIMAP_H}",
+                        xmlns: "http://www.w3.org/2000/svg",
+                        style: "display: block;",
+
+                        // Subtle
+                        defs {
+                            pattern {
+                                id: "mm-dots", width: "10", height: "10",
+                                pattern_units: "userSpaceOnUse",
+                                circle { cx: "1", cy: "1", r: "0.4", fill: "#1a1a1a" }
+                            }
+                        }
+                        rect {
+                            width: "{MINIMAP_W}",
+                            height: "{MINIMAP_H}",
+                            fill: "url(#mm-dots)",
+                        }
+                        //Clickable transparent overlay — navigate on click
+                        rect {
+                            width: "{MINIMAP_W}",
+                            height: "{MINIMAP_H}",
+                            fill: "transparent",
+                            style: "cursor: crosshair;",
+                            onclick: move |e| {
+                                let coords = e.element_coordinates();
+                                let mx = coords.x;
+                                let my = coords.y;
+                                // Canvas point the user clicked
+                                let cx = mx / mm_s_click;
+                                let cy = my / mm_s_click;
+                                // Center the viewport on that canvas point.
+                                offset_x.set(APPROX_VW / (2.0 * s_click) - cx);
+                                offset_y.set(APPROX_VW / (2.0 * s_click) - cy);
+                            },
+                        }
+
+                        //Commit dots
+                        for (commit, cx, cy, matches) in mm_positioned.iter() {
+                            {
+                                let dot_x = cx * mm_s;
+                                let dot_y = cy * mm_s;
+                                let color = commit.color.clone();
+                                let dot_r = if commit.is_merge { 2.5_f64 } else { 2.0_f64 };
+                                let sel   = selected_hash.as_deref() == Some(&commit.hash);
+                                let opacity = if search_query.is_empty() || *matches { "1" } else { "0.15" };
+                                rsx! {
+                                    circle {
+                                        key: "mm-{commit.short_hash}",
+                                        cx: "{dot_x}",
+                                        cy: "{dot_y}",
+                                        r: "{dot_r}",
+                                        fill: "{color}",
+                                        opacity: "{opacity}",
+                                        stroke: if sel { "white" } else { "" },
+                                        stroke_width: if sel { "0.8" } else { "0" },
+                                    }
+                                }
+                            }
+                        }
+                        // Viewport indicator rectangle
+                        rect {
+                            x: "{vp_x}",
+                            y: "{vp_y}",
+                            width: "{vp_w}",
+                            height: "{vp_h}",
+                            fill: "rgba(155, 93, 229, 0.08)",
+                            stroke: "var(--accent)",
+                            stroke_width: "0.75",
+                        }
+
+                        text {
+                            x: "4",
+                            y: "{MINIMAP_H - 4.0}",
+                            fill: "var(--text-muted)",
+                            font_size: "7",
+                            font_family: "Space Mono, monospace",
+                            letter_spacing: "0.12em",
+                            "MINIMAP"
+                        }
+                    }
+                }
+            }
+
+            // ── Main canvas ────────────────────────────────────────────────
             div {
                 style: "width: 100%; height: 100%; overflow: hidden;",
 

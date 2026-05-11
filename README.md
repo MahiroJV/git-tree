@@ -23,6 +23,8 @@
 
 ---
 
+---
+
 ## What is it?
 
 git-tree lets you visualize your git history in a clean terminal-style desktop app. Open any local repo or clone a remote one, click any commit node to see author, date, message, and diff stats. Full diff viewer included.
@@ -35,19 +37,25 @@ git-tree lets you visualize your git history in a clean terminal-style desktop a
 
 ---
 
-## Features (v0.2)
+## Features (v0.3)
 
 - Open local git repos or clone remote URLs
+- Search GitHub repositories and clone directly from the app
 - Horizontal **and** vertical branch tree layouts
+- Curved or geometric branch connector styles
 - Each contributor gets a unique persistent color
 - Click any commit node → author, date, message, hash, diff stats
 - Full diff viewer with per-file collapse/expand and hunk lines
 - Search commits by author, message, or hash
 - Keyboard navigation between commits (← → or ↑ ↓)
 - Zoom + pan (CTRL+scroll, drag, or toolbar buttons)
+- **Minimap** — corner overview of the full tree with click-to-navigate
+- **Repo stats** — contributor leaderboard + 52-week commit heatmap
+- Open any commit directly in GitHub / GitLab in your browser
+- Node pulse animation on click
 - Recent repositories list with search filter
 - Copy commit hash to clipboard
-- 11 built-in themes with live preview in settings
+- 15 built-in themes with live preview in settings
 - CRT scanline overlay (toggleable)
 - Font size control (11–16px)
 - Node spacing control (Compact / Normal / Wide)
@@ -91,15 +99,21 @@ sudo dnf install libgit2-devel webkit2gtk4.1-devel gtk3-devel
 Grab the latest release from the [Releases page](https://github.com/MahiroJV/git-tree/releases/latest):
 
 ```bash
-wget https://github.com/MahiroJV/git-tree/releases/latest/download/git-tree-linux
-chmod +x git-tree-linux
-./git-tree-linux
+wget https://github.com/MahiroJV/git-tree/releases/latest/download/git-tree-linux-x86_64
+chmod +x git-tree-linux-x86_64
+./git-tree-linux-x86_64
 ```
 
 Or move it to your PATH for system-wide access:
 ```bash
-sudo mv git-tree-linux /usr/local/bin/git-tree
+sudo mv git-tree-linux-x86_64 /usr/local/bin/git-tree
 git-tree
+```
+
+**AppImage (no dependencies needed):**
+```bash
+chmod +x git-tree-*-x86_64.AppImage
+./git-tree-*-x86_64.AppImage
 ```
 
 ---
@@ -143,17 +157,26 @@ dx build --platform desktop --release
 3. Click `CLONE →`
 4. git-tree clones it to a temp folder and opens it
 
+**Search GitHub:**
+1. Click `[ SEARCH ONLINE ]` tab
+2. Type any query (e.g. `rust async runtime`)
+3. Hit Enter or click `SEARCH →`
+4. Click `CLONE →` on any result to open it instantly
+
 **Navigating the tree:**
 - Click any commit node → left panel shows commit info, right panel shows diff stats
 - `← →` (horizontal) or `↑ ↓` (vertical) to move between commits
 - `ESC` to deselect
 - `CTRL+scroll` to zoom, drag to pan
+- Click anywhere on the **minimap** to jump to that region
 - Toolbar → `[ VIEW DIFF ]` to open the full diff viewer
+- Toolbar → `[ STATS ]` to open the repo stats screen
 
 **Settings:**
-- 11 themes with live preview
+- 15 themes with live preview
 - Font size, node spacing, merge commit visibility
 - Tree direction (Horizontal / Vertical)
+- Branch style (Curved / Geometric)
 - CRT scanline overlay
 
 ---
@@ -173,6 +196,10 @@ dx build --platform desktop --release
 | **Ice Terminal** | Cold blue cyberpunk |
 | **Light** | Paper white, clean |
 | **Dark** | Deeper black than Terminal |
+| **Tokyo Night** | Deep blue city lights |
+| **Cappuccino Mocha** | Catppuccin-inspired warm dark |
+| **Rose Pine** | Muted dawn purple |
+| **Everforest** | Muted forest green |
 
 ---
 
@@ -205,28 +232,29 @@ dx build --platform desktop --release
 
 ---
 
-### 🎨 v0.3 — Polish
-- [ ] Minimap (corner overview of the full tree)
-- [ ] Repo stats (contributor leaderboard + commit heatmap)
-- [ ] Export tree as SVG or PNG
+### 🎨 v0.3 — Polish ✅
+- [x] Minimap (corner overview of the full tree, click-to-navigate)
+- [x] Repo stats (contributor leaderboard + commit heatmap)
 - [x] Open commit in browser (GitHub / GitLab)
 - [x] Node pulse animation on click
-- [x] Blame view (per-file line authorship)
+- [x] GitHub repository search + one-click clone
+- [x] Curved and geometric branch connector styles
+- [x] 4 extra themes (Tokyo Night, Cappuccino Mocha, Rose Pine, Everforest)
+- [ ] Export tree as SVG or PNG
 
 ---
 
 ### 🖥️ v0.4 — Platform
-- [ ] GitHub OAuth login
-- [ ] Private repo access
-- [ ] Windows + macOS builds (CI)
-- [ ] Linux AppImage packaging
+- [ ] GitHub OAuth login (private repo access)
+- [ ] Windows installer (MSI via cargo-wix)
+- [ ] macOS build
+- [ ] Linux Flatpak / Snap packaging
 
 ---
 
 ### 🏁 v1.0 — Release
-- [ ] Android port (Dioxus mobile)
 - [ ] Full keyboard shortcut system
-- [ ] Performance improvements (lazy loading for huge repos)
+- [ ] Performance improvements for very large repos
 - [ ] Community themes
 
 ---
@@ -237,19 +265,22 @@ dx build --platform desktop --release
 src/
 ├── main.rs                 # Entry point, window config
 ├── app.rs                  # Root component + global state
-├── theme.rs                # 11 themes + contributor color engine
+├── theme.rs                # 15 themes + contributor color engine
 ├── recent.rs               # Recent repos persistence (~/.config/git-tree/)
 ├── components/
-│   ├── home_screen.rs      # Repo open/clone screen + recent list
+│   ├── home_screen.rs      # Repo open/clone/search screen + recent list
 │   ├── toolbar.rs          # Top navigation + search bar
-│   ├── tree_canvas.rs      # SVG tree (horizontal + vertical layouts)
+│   ├── tree_canvas.rs      # SVG tree (horizontal + vertical + minimap)
 │   ├── left_panel.rs       # Commit details + copy hash
 │   ├── right_panel.rs      # Diff stats + file list
 │   ├── diff_viewer.rs      # Full diff viewer with per-file collapse
+│   ├── stats.rs            # Repo stats (heatmap + contributor leaderboard)
 │   └── settings.rs         # Theme selector + display options
 └── git/
     ├── loader.rs           # Open local / clone remote
-    └── parser.rs           # Git history → tree data structures
+    ├── parser.rs           # Git history → tree data structures
+    ├── search.rs           # GitHub API search
+    └── url.rs              # Remote URL → browser URL conversion
 
 assets/
 ├── css/
@@ -257,7 +288,8 @@ assets/
 │   ├── diff_viewer.css     # Diff viewer styles
 │   ├── left_panel.css      # Left panel styles
 │   ├── right_panel.css     # Right panel styles
-│   └── panel_shared.css    # Shared collapse/expand styles
+│   ├── panel_shared.css    # Shared collapse/expand styles
+│   └── stats.css           # Stats screen styles
 └── fonts/
     ├── Oxanium.ttf
     └── SpaceMono-Regular.woff2
