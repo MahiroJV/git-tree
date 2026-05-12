@@ -1,55 +1,4 @@
 <?xml version='1.0' encoding='windows-1252'?>
-<!--
-  Copyright (C) 2017 Christopher R. Field.
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
--->
-
-<!--
-  The "cargo wix" subcommand provides a variety of predefined variables available
-  for customization of this template. The values for each variable are set at
-  installer creation time. The following variables are available:
-
-  TargetTriple      = The rustc target triple name.
-  TargetEnv         = The rustc target environment. This is typically either
-                      "msvc" or "gnu" depending on the toolchain downloaded and
-                      installed.
-  TargetVendor      = The rustc target vendor. This is typically "pc", but Rust
-                      does support other vendors, like "uwp".
-  CargoTargetBinDir = The complete path to the directory containing the
-                      binaries (exes) to include. The default would be
-                      "target\release\". If an explicit rustc target triple is
-                      used, i.e. cross-compiling, then the default path would
-                      be "target\<CARGO_TARGET>\<CARGO_PROFILE>",
-                      where "<CARGO_TARGET>" is replaced with the "CargoTarget"
-                      variable value and "<CARGO_PROFILE>" is replaced with the
-                      value from the "CargoProfile" variable. This can also
-                      be overridden manually with the "target-bin-dir" flag.
-  CargoTargetDir    = The path to the directory for the build artifacts, i.e.
-                      "target".
-  CargoProfile      = The cargo profile used to build the binaries
-                      (usually "debug" or "release").
-  Version           = The version for the installer. The default is the
-                      "Major.Minor.Fix" semantic versioning number of the Rust
-                      package.
--->
-
-<!--
-  Please do not remove these pre-processor If-Else blocks. These are used with
-  the `cargo wix` subcommand to automatically determine the installation
-  destination for 32-bit versus 64-bit installers. Removal of these lines will
-  cause installation errors.
--->
 <?if $(sys.BUILDARCH) = x64 or $(sys.BUILDARCH) = arm64 ?>
     <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
 <?else ?>
@@ -67,16 +16,14 @@
     Codepage="1252"
     Version="$(var.Version)">
 
-    <!-- ───────── Package ───────── -->
     <Package
       InstallerVersion="500"
       Compressed="yes"
       InstallScope="perMachine"
-      Description="Git repository visualizer"/>
+      Description="Terminal-style git branch visualizer"/>
 
-    <!-- ───────── Upgrade ───────── -->
     <MajorUpgrade
-      DowngradeErrorMessage="A newer version is already installed."/>
+      DowngradeErrorMessage="A newer version of Git Tree is already installed."/>
 
     <Media Id="1" Cabinet="media.cab" EmbedCab="yes"/>
 
@@ -84,31 +31,27 @@
     <Directory Id="TARGETDIR" Name="SourceDir">
 
       <Directory Id="$(var.PlatformProgramFilesFolder)">
+        <!-- Flat layout: exe goes directly in Program Files\GitTree\
+             so WorkingDirectory resolves correctly and WebView2 finds
+             its %APPDATA% path without needing write access here.   -->
         <Directory Id="INSTALLFOLDER" Name="GitTree">
-
-          <Directory Id="BIN" Name="bin">
-
-            <!-- EXE -->
-            <Component Id="MainExe" Guid="*">
-              <File
-                Id="GitTreeExe"
-                Source="$(var.CargoTargetBinDir)\git-tree.exe"
-                KeyPath="yes"/>
-            </Component>
-
-          </Directory>
-
+          <Component Id="MainExe" Guid="*">
+            <File
+              Id="GitTreeExe"
+              Source="$(var.CargoTargetBinDir)\git-tree.exe"
+              KeyPath="yes"/>
+          </Component>
         </Directory>
       </Directory>
 
-      <!-- Desktop -->
+      <!-- Desktop shortcut -->
       <Directory Id="DesktopFolder">
         <Component Id="DesktopShortcut" Guid="*">
           <Shortcut
             Id="DesktopShortcutLink"
             Name="Git Tree"
-            Target="[BIN]git-tree.exe"
-            WorkingDirectory="BIN"
+            Target="[INSTALLFOLDER]git-tree.exe"
+            WorkingDirectory="INSTALLFOLDER"
             Icon="GitTreeIcon"/>
           <RegistryValue Root="HKCU"
             Key="Software\GitTree"
@@ -119,15 +62,15 @@
         </Component>
       </Directory>
 
-      <!-- Start Menu -->
+      <!-- Start Menu shortcut -->
       <Directory Id="ProgramMenuFolder">
         <Directory Id="AppProgramsFolder" Name="Git Tree">
           <Component Id="StartMenuShortcut" Guid="*">
             <Shortcut
               Id="StartMenuLink"
               Name="Git Tree"
-              Target="[BIN]git-tree.exe"
-              WorkingDirectory="BIN"
+              Target="[INSTALLFOLDER]git-tree.exe"
+              WorkingDirectory="INSTALLFOLDER"
               Icon="GitTreeIcon"/>
             <RemoveFolder Id="AppProgramsFolder" On="uninstall"/>
             <RegistryValue Root="HKCU"
@@ -144,11 +87,9 @@
 
     <!-- ───────── Features ───────── -->
     <Feature Id="MainFeature" Title="Git Tree" Level="1">
-
       <ComponentRef Id="MainExe"/>
       <ComponentRef Id="DesktopShortcut"/>
       <ComponentRef Id="StartMenuShortcut"/>
-
     </Feature>
 
     <!-- ───────── Icon ───────── -->
@@ -160,7 +101,7 @@
       <UIRef Id="WixUI_FeatureTree"/>
     </UI>
 
-    <!-- ───────── License (optional) ───────── -->
+    <!-- ───────── License ───────── -->
     <WixVariable Id="WixUILicenseRtf" Value="wix\License.rtf"/>
 
   </Product>

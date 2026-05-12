@@ -10,6 +10,7 @@ pub fn Toolbar(
     on_settings: EventHandler<()>,
     on_refresh: EventHandler<()>,
     on_stats: EventHandler<()>,
+    on_export: EventHandler<()>,
 ) -> Element {
     rsx! {
         nav {
@@ -62,6 +63,11 @@ pub fn Toolbar(
                     class: "toolbar-btn",
                     onclick: move |_| on_stats.call(()),
                     "[ STATS ]"
+                }
+                button {
+                    class: "toolbar-btn",
+                    onclick: move |_| on_export.call(()),
+                    "[ EXPORT ]"
                 }
                 button {
                     class: "toolbar-btn toolbar-btn-accent",

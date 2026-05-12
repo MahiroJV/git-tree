@@ -8,6 +8,7 @@ use crate::components::{
     toolbar::Toolbar,
     tree_canvas::{BranchStyle, TreeCanvas, TreeDirection},
 };
+use crate::git::export::generate_svg;
 use crate::git::loader::load_commit_diff;
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
@@ -78,6 +79,31 @@ pub fn App() -> Element {
         )
     });
 
+    //SVG
+    let handle_export = move |_| {
+        let maybe_tree = repo_tree.read().clone();
+        let spacing_s = *node_spacing.read();
+        let merges = *show_merges.read();
+        let direction = tree_direction.read().clone();
+        let style = branch_style.read().clone();
+
+        if let Some(tree) = maybe_tree {
+            let svg_content = generate_svg(&tree, spacing_s, merges, &direction, &style);
+
+            spawn(async move {
+                let file = rfd::AsyncFileDialog::new()
+                    .set_title("Export tree as SVG")
+                    .add_filter("SVG image", &["svg"])
+                    .set_file_name("git-tree-export.svg")
+                    .save_file()
+                    .await;
+
+                if let Some(handle) = file {
+                    let _ = handle.write(svg_content.as_bytes()).await;
+                }
+            });
+        }
+    };
     rsx! {
         style { "{BASE_CSS}" }
         style { "{theme_css}" }
@@ -105,6 +131,7 @@ pub fn App() -> Element {
                         on_settings: move |_| screen.set(Screen::Settings),
                         on_refresh:  move |_| {},
                         on_stats: move |_| screen.set(Screen::Stats),
+                        on_export: handle_export,
                     }
                 },
                 _ => rsx! {}

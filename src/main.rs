@@ -18,7 +18,11 @@ fn main() {
     let (w, h) = img.dimensions();
     let icon = Icon::from_rgba(img.into_raw(), w, h).unwrap();
 
-    let config = Config::default().with_window(
+    let data_dir = dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("git-tree");
+
+    let config = Config::default().with_data_directory(data_dir).with_window(
         WindowBuilder::new()
             .with_title("git-tree")
             .with_window_icon(Some(icon))
