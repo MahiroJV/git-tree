@@ -5,6 +5,8 @@
     <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
 <?endif ?>
 
+<?define ExePath="dist/git-tree-windows-x86_64.exe" ?>
+
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
 
   <Product
@@ -36,7 +38,6 @@
              its %APPDATA% path without needing write access here.   -->
         <Directory Id="INSTALLFOLDER" Name="GitTree">
           <Component Id="MainExe" Guid="*">
-            <?define ExePath="dist/git-tree-windows-x86_64.exe" ?>
             <File
               Id="GitTreeExe"
               Source="${var.ExePath}"
