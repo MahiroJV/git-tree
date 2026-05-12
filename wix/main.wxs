@@ -5,8 +5,6 @@
     <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
 <?endif ?>
 
-<?define ExePath="dist/git-tree-windows-x86_64.exe" ?>
-
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
 
   <Product
@@ -40,7 +38,7 @@
           <Component Id="MainExe" Guid="*">
             <File
               Id="GitTreeExe"
-              Source="${var.ExePath}"
+              Source="dist/git-tree-windows-x86_64.exe"
               KeyPath="yes"/>
           </Component>
         </Directory>
