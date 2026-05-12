@@ -75,7 +75,7 @@ sudo pacman -S libgit2 webkit2gtk-4.1 gtk3 base-devel
 For the best experience, use the official installer:
 
 ```bash id="lnx03"
-curl -fsSL https://raw.githubusercontent.com/<repo>/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/MahiroJV/git-tree/master/install.sh | bash
 ```
 
 ## ![Fedora](https://img.shields.io/badge/Fedora-51A2DA?style=for-the-badge&logo=fedora&logoColor=white)
