@@ -23,42 +23,26 @@
 
 ---
 
-## What is it?
+## ✨ Overview
 
-git-tree lets you visualize your git history in a clean terminal-style desktop app. Open any local repo or clone a remote one, click any commit node to see author, date, message, and diff stats. Full diff viewer included.
+**git-tree** is a desktop Git visualizer that turns commit history into an interactive tree.
 
-```
- ──●──●──●──●──●──●──●──
-        ╲       ╱
-         ●─────●
-```
+Explore branches, inspect commits, view diffs, and analyze repository activity in a clean terminal-style UI.
 
 ---
 
-## Features (v0.3)
+## ⚡ Features
 
-- Open local git repos or clone remote URLs
-- Search GitHub repositories and clone directly from the app
-- Horizontal **and** vertical branch tree layouts
-- Curved or geometric branch connector styles
-- Each contributor gets a unique persistent color
-- Click any commit node → author, date, message, hash, diff stats
-- Full diff viewer with per-file collapse/expand and hunk lines
-- Search commits by author, message, or hash
-- Keyboard navigation between commits (← → or ↑ ↓)
-- Zoom + pan (CTRL+scroll, drag, or toolbar buttons)
-- **Minimap** — corner overview of the full tree with click-to-navigate
-- **Repo stats** — contributor leaderboard + 52-week commit heatmap
-- Open any commit directly in GitHub / GitLab in your browser
-- Node pulse animation on click
-- Recent repositories list with search filter
-- Copy commit hash to clipboard
-- 15 built-in themes with live preview in settings
-- CRT scanline overlay (toggleable)
-- Font size control (11–16px)
-- Node spacing control (Compact / Normal / Wide)
-- Merge commit visibility toggle
-- Default theme: **Terminal** (black + purple, Space Mono font)
+- 🌳 Interactive commit tree (horizontal & vertical)
+- 🔍 Commit search (author, message, hash)
+- 📄 Full diff viewer with collapsible files
+- 🧭 Minimap navigation
+- 📊 Repository statistics (contributors + heatmap)
+- 🎨 15 built-in themes
+- 🖱️ Mouse + keyboard navigation
+- 🔗 Open commits in GitHub/GitLab
+- 📁 Clone or open local repositories
+- ⚡ Fast native Rust performance
 
 ---
 
@@ -98,6 +82,7 @@ curl -fsSL https://raw.githubusercontent.com/<repo>/install.sh | bash
 ```bash
 sudo dnf install libgit2-devel webkit2gtk4.1-devel gtk3-devel
 ```
+---
 
 **2. Download the binary**
 
@@ -120,7 +105,9 @@ git-tree
 chmod +x git-tree-*-x86_64.AppImage
 ./git-tree-*-x86_64.AppImage
 ```
-If you have any problems with installation, please check the [Wiki](https://github.com/<username>/<repo>/wiki).
+---
+# Documentation
+**If you have any problems with installation, please check the [Wiki](https://github.com/MahiroJV/git-tree/wiki).**
 
 ---
 
