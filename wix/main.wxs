@@ -50,7 +50,7 @@
           <Shortcut
             Id="DesktopShortcutLink"
             Name="Git Tree"
-            Target="[INSTALLFOLDER]git-tree.exe"
+            Target="[INSTALLFOLDER]git-tree-windows-x86_64.exe"
             WorkingDirectory="INSTALLFOLDER"
             Icon="GitTreeIcon"/>
           <RegistryValue Root="HKCU"
@@ -69,7 +69,7 @@
             <Shortcut
               Id="StartMenuLink"
               Name="Git Tree"
-              Target="[INSTALLFOLDER]git-tree.exe"
+              Target="[INSTALLFOLDER]git-tree-windows-x86_64.exe"
               WorkingDirectory="INSTALLFOLDER"
               Icon="GitTreeIcon"/>
             <RemoveFolder Id="AppProgramsFolder" On="uninstall"/>

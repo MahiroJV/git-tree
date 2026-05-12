@@ -52,7 +52,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-wix
-        run: cargo install cargo-wix --locked
+        run: cargo install cargo-wix --locked 
 
       - name: Build MSI installer
         working-directory: ${{ github.workspace }}
