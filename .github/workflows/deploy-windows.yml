@@ -55,7 +55,8 @@ jobs:
         run: cargo install cargo-wix --locked
 
       - name: Build MSI installer
-        run: cargo wix --output dist/git-tree-${{ github.ref_name }}-x86_64.msi
+        working-directory: ${{ github.workspace }}
+        run: cargo wix --output dist/git-tree-${{ github.ref_name }}-x86_64.msi --define ExePath=dist/git-tree-windows-x86_64.exe
         env:
           OPENSSL_STATIC: "1"
 

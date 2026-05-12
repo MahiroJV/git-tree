@@ -36,9 +36,10 @@
              its %APPDATA% path without needing write access here.   -->
         <Directory Id="INSTALLFOLDER" Name="GitTree">
           <Component Id="MainExe" Guid="*">
+            <?define ExePath="dist/git-tree-windows-x86_64.exe" ?>
             <File
               Id="GitTreeExe"
-              Source="$(var.CargoTargetBinDir)\git-tree.exe"
+              Source="${var.ExePath}"
               KeyPath="yes"/>
           </Component>
         </Directory>
