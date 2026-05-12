@@ -43,7 +43,7 @@ pub fn App() -> Element {
     let mut crt_overlay = use_signal(|| false);
     let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
     let mut branch_style = use_signal(|| BranchStyle::Curved);
-    //let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
+    let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
     let mut diff_loading = use_signal(|| false);
 
     let mut diff_cache: Signal<
@@ -59,15 +59,15 @@ pub fn App() -> Element {
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
-        //let _z = *zoom.read();
+        let _z = *zoom.read();
         format!(
             ":root {{ \
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
                 --text-muted:{tm}; --accent:{ac}; --border:{bo}; \
                 --success:{su}; --danger:{da}; \
                 --font-size:{fs}px; \
-            }}",
-            //html {{ zoom: {zoom:.3}; }},
+            }} \
+            html {{ zoom: {zoom:.3}; }}",
             bg = t.bg,
             bgs = t.bg_secondary,
             text = t.text,
@@ -111,7 +111,8 @@ pub fn App() -> Element {
 
         div {
             class: "app-root",
-            //style: "zoom: {zoom};",
+            style: "transform: scale({zoom}); transform-origin: 0 0; \
+            width: calc(100vw / {zoom}); height: calc(100vh / {zoom});",
 
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }
