@@ -23,8 +23,6 @@
 
 ---
 
----
-
 ## What is it?
 
 git-tree lets you visualize your git history in a clean terminal-style desktop app. Open any local repo or clone a remote one, click any commit node to see author, date, message, and diff stats. Full diff viewer included.
@@ -64,13 +62,13 @@ git-tree lets you visualize your git history in a clean terminal-style desktop a
 
 ---
 
-## Install
+# Installation
 
 ### Linux (recommended)
 
 **1. Install system dependencies**
 
-Ubuntu / Debian:
+## ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
 ```bash
 sudo apt update
 sudo apt install -y \
@@ -84,12 +82,19 @@ sudo apt install -y \
   pkg-config
 ```
 
-Arch Linux:
+## ![Arch Linux](https://img.shields.io/badge/Arch%20Linux-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)
 ```bash
 sudo pacman -S libgit2 webkit2gtk-4.1 gtk3 base-devel
 ```
+### 🚀 Recommended Installation for Arch 
 
-Fedora:
+For the best experience, use the official installer:
+
+```bash id="lnx03"
+curl -fsSL https://raw.githubusercontent.com/<repo>/install.sh | bash
+```
+
+## ![Fedora](https://img.shields.io/badge/Fedora-51A2DA?style=for-the-badge&logo=fedora&logoColor=white)
 ```bash
 sudo dnf install libgit2-devel webkit2gtk4.1-devel gtk3-devel
 ```
@@ -115,6 +120,7 @@ git-tree
 chmod +x git-tree-*-x86_64.AppImage
 ./git-tree-*-x86_64.AppImage
 ```
+If you have any problems with installation, please check the [Wiki](https://github.com/<username>/<repo>/wiki).
 
 ---
 
