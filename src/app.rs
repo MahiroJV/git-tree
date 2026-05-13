@@ -43,8 +43,8 @@ pub fn App() -> Element {
     let mut crt_overlay = use_signal(|| false);
     let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
     let mut branch_style = use_signal(|| BranchStyle::Curved);
-    let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
     let mut diff_loading = use_signal(|| false);
+    let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
 
     let mut diff_cache: Signal<
         std::collections::HashMap<
@@ -65,9 +65,9 @@ pub fn App() -> Element {
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
                 --text-muted:{tm}; --accent:{ac}; --border:{bo}; \
                 --success:{su}; --danger:{da}; \
-                --font-size:{fs}px; \
-            }} \
-            html {{ zoom: {zoom:.3}; }}",
+                --font-size:{fs}px; --zoom:{zoom:.4}; \
+            }}",
+            zoom = *zoom.read(),
             bg = t.bg,
             bgs = t.bg_secondary,
             text = t.text,
@@ -111,8 +111,10 @@ pub fn App() -> Element {
 
         div {
             class: "app-root",
-            style: "transform: scale({zoom}); transform-origin: 0 0; \
-            width: calc(100vw / {zoom}); height: calc(100vh / {zoom});",
+            style: "width: calc(100vw / var(--zoom)); \
+            height: calc(100vh / var(--zoom)); \
+            transform: scale(var(--zoom)); \
+            transform-origin: top left;",
 
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }

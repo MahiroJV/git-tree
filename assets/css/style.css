@@ -518,7 +518,7 @@ body,
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    height: 100%;
     gap: 28px;
     padding: 40px;
     background: var(--bg);
@@ -655,7 +655,7 @@ body,
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    height: 100%;
     gap: 12px;
     background: var(--bg);
 }
@@ -684,7 +684,7 @@ body,
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: calc(100vh - var(--toolbar-height));
+    height: calc(100% - var(--toolbar-height));
     overflow-y: auto;
     padding: 32px 48px;
     gap: 36px;
