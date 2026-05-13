@@ -13,7 +13,7 @@ mod recent;
 mod theme;
 
 fn main() {
-    let icon_bytes = include_bytes!("../assets/icon/icon.png");
+    let icon_bytes = include_bytes!("../assets/icon/png/icon.png");
     let img = load_from_memory(icon_bytes).unwrap().to_rgba8();
     let (w, h) = img.dimensions();
     let icon = Icon::from_rgba(img.into_raw(), w, h).unwrap();

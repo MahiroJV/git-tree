@@ -93,7 +93,7 @@
     </Feature>
 
     <!-- ───────── Icon ───────── -->
-    <Icon Id="GitTreeIcon" SourceFile="wix\icon.ico"/>
+    <Icon Id="GitTreeIcon" SourceFile="wix\128x128.ico"/>
     <Property Id="ARPPRODUCTICON" Value="GitTreeIcon"/>
 
     <!-- ───────── UI ───────── -->

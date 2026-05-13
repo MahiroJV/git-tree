@@ -31,6 +31,22 @@ Explore branches, inspect commits, view diffs, and analyze repository activity i
 
 ---
 
+## Screenshots
+<details>
+<summary>Screenshot Gallery</summary>
+
+<p align="center">
+    <img src="assets/screenshot/sc1.png" width="100%" />
+    <img src="assets/screenshot/sc2.png" width="100%" />
+    <img src="assets/screenshot/sc3.png" width="100%" />
+    <img src="assets/screenshot/sc4.png" width="100%" />
+    <img src="assets/screenshot/sc5.png" width="100%" />
+    <img src="assets/screenshot/sc6.png" width="100%" />
+</p>
+
+</details>
+
+---
 ## ⚡ Features
 
 - 🌳 Interactive commit tree (horizontal & vertical)
