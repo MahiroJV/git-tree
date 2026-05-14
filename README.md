@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/icon/icon.svg" height="256" alt="git-tree logo" />
+  <img src="assets/icon/svg/icon.svg" height="256" alt="git-tree logo" />
   <h1>git-tree</h1>
 
   <p><i>Terminal-style git branch visualizer — built with Rust + Dioxus</i></p>
