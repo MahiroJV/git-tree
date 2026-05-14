@@ -10,7 +10,9 @@ mod app;
 mod components;
 mod git;
 mod recent;
+mod settings_store;
 mod theme;
+mod updater;
 
 fn main() {
     let icon_bytes = include_bytes!("../assets/icon/png/icon.png");

@@ -12,7 +12,9 @@ use crate::git::export::generate_svg;
 use crate::git::loader::load_commit_diff;
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
+use crate::settings_store::{load_settings, save_settings, AppSettings};
 use crate::theme::theme_by_name;
+use crate::updater::{check_for_updates, download_and_apply, UpdateInfo};
 use dioxus::prelude::*;
 
 const BASE_CSS: &str = include_str!("../assets/css/style.css");
@@ -27,23 +29,69 @@ pub enum Screen {
     Diff(Box<CommitNode>),
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum UpdateState {
+    /// Background check still running (or not started yet)
+    Checking,
+    /// No update / check failed silently
+    Idle,
+    /// A new version is available — show the banner
+    Available(UpdateInfo),
+    /// Download in progress; u8 is 0-100 percent
+    Downloading(u8),
+    /// Download done — ask user to restart
+    ReadyToRestart,
+    /// Something went wrong
+    Error(String),
+}
+
 #[component]
 pub fn App() -> Element {
+    let saved = load_settings();
+
     let mut screen = use_signal(|| Screen::Home);
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
-    let mut theme_name = use_signal(|| "Terminal".to_string());
+    let mut clone_error = use_signal(|| Option::<String>::None);
+    let mut diff_loading = use_signal(|| false);
+
+    // ── Settings signals seeded from disk ─────────────────────────────────
+    let mut theme_name = use_signal(|| saved.theme_name.clone());
+    let mut font_size = use_signal(|| saved.font_size);
+    let mut node_spacing = use_signal(|| saved.node_spacing);
+    let mut show_merges = use_signal(|| saved.show_merges);
+    let mut crt_overlay = use_signal(|| saved.crt_overlay);
+    let mut tree_direction = use_signal(|| saved.tree_direction.clone());
+    let mut branch_style = use_signal(|| saved.branch_style.clone());
+
+    let current_settings = move || AppSettings {
+        theme_name: theme_name.read().clone(),
+        font_size: *font_size.read(),
+        node_spacing: *node_spacing.read(),
+        show_merges: *show_merges.read(),
+        crt_overlay: *crt_overlay.read(),
+        tree_direction: tree_direction.read().clone(),
+        branch_style: branch_style.read().clone(),
+    };
+
     let mut search_query = use_signal(String::new);
     let mut left_open = use_signal(|| true);
     let mut right_open = use_signal(|| true);
-    let mut clone_error = use_signal(|| Option::<String>::None);
-    let mut font_size = use_signal(|| 13_u32);
-    let mut node_spacing = use_signal(|| 120.0_f64);
-    let mut show_merges = use_signal(|| true);
-    let mut crt_overlay = use_signal(|| false);
-    let mut tree_direction = use_signal(|| TreeDirection::Horizontal);
-    let mut branch_style = use_signal(|| BranchStyle::Curved);
-    let mut diff_loading = use_signal(|| false);
+
+    // ── Update state ──────────────────────────────────────────────────────
+    let mut update_state: Signal<UpdateState> = use_signal(|| UpdateState::Checking);
+
+    // Kick off the background update check once, right after mount.
+    use_effect(move || {
+        spawn(async move {
+            match check_for_updates().await {
+                Ok(Some(info)) => update_state.set(UpdateState::Available(info)),
+                Ok(None) => update_state.set(UpdateState::Idle),
+                Err(_) => update_state.set(UpdateState::Idle), // silent fail
+            }
+        });
+    });
+
     let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
 
     let mut diff_cache: Signal<
@@ -119,6 +167,39 @@ pub fn App() -> Element {
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }
             }
+
+            // ── Update banner (shown on every screen) ─────────────────────
+            UpdateBanner { state: update_state.read().clone(), on_update: move |_| {
+                let state = update_state.read().clone();
+                if let UpdateState::Available(info) = state {
+                    let url = info.download_url.clone();
+                    update_state.set(UpdateState::Downloading(0));
+                    spawn(async move {
+                        // Create a watch channel so we can stream progress into the signal.
+                        let (tx, mut rx) = tokio::sync::watch::channel(0u8);
+                        let url2 = url.clone();
+                        let mut dl = tokio::spawn(async move {
+                            download_and_apply(&url2, Some(tx)).await
+                        });
+                        // Poll progress while download runs.
+                        loop {
+                            tokio::select! {
+                                _ = rx.changed() => {
+                                    update_state.set(UpdateState::Downloading(*rx.borrow()));
+                                }
+                                result = &mut dl => {
+                                    match result {
+                                        Ok(Ok(())) => update_state.set(UpdateState::ReadyToRestart),
+                                        Ok(Err(e)) => update_state.set(UpdateState::Error(e.to_string())),
+                                        Err(_)     => update_state.set(UpdateState::Error("Download task panicked".into())),
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+            }}
 
             match screen.read().clone() {
                 Screen::Tree => rsx! {
@@ -267,21 +348,42 @@ pub fn App() -> Element {
 
                 Screen::Settings => rsx! {
                     Settings {
-                        current_theme:            theme_name.read().clone(),
-                        font_size:                *font_size.read(),
-                        node_spacing:             *node_spacing.read(),
-                        show_merges:              *show_merges.read(),
-                        crt_overlay:              *crt_overlay.read(),
-                        tree_direction:           tree_direction.read().clone(),
-                        branch_style:             branch_style.read().clone(),
-                        on_theme_change:          move |name: String| theme_name.set(name),
-                        on_font_size_change:      move |fs: u32|      font_size.set(fs),
-                        on_node_spacing_change:   move |ns: f64|      node_spacing.set(ns),
-                        on_show_merges_change:    move |v: bool|      show_merges.set(v),
-                        on_crt_overlay_change:    move |v: bool|      crt_overlay.set(v),
-                        on_tree_direction_change: move |d: TreeDirection| tree_direction.set(d),
-                        on_branch_style_change:   move |s: BranchStyle|  branch_style.set(s),
-                        on_back:                  move |_| screen.set(Screen::Tree),
+                        current_theme:  theme_name.read().clone(),
+                        font_size:      *font_size.read(),
+                        node_spacing:   *node_spacing.read(),
+                        show_merges:    *show_merges.read(),
+                        crt_overlay:    *crt_overlay.read(),
+                        tree_direction: tree_direction.read().clone(),
+                        branch_style:   branch_style.read().clone(),
+                        on_theme_change: move |name: String| {
+                            theme_name.set(name);
+                            save_settings(&current_settings());
+                        },
+                        on_font_size_change: move |fs: u32| {
+                            font_size.set(fs);
+                            save_settings(&current_settings());
+                        },
+                        on_node_spacing_change: move |ns: f64| {
+                            node_spacing.set(ns);
+                            save_settings(&current_settings());
+                        },
+                        on_show_merges_change: move |v: bool| {
+                            show_merges.set(v);
+                            save_settings(&current_settings());
+                        },
+                        on_crt_overlay_change: move |v: bool| {
+                            crt_overlay.set(v);
+                            save_settings(&current_settings());
+                        },
+                        on_tree_direction_change: move |d: TreeDirection| {
+                            tree_direction.set(d);
+                            save_settings(&current_settings());
+                        },
+                        on_branch_style_change: move |s: BranchStyle| {
+                            branch_style.set(s);
+                            save_settings(&current_settings());
+                        },
+                        on_back: move |_| screen.set(Screen::Tree),
                     }
                 },
 
@@ -307,5 +409,51 @@ pub fn App() -> Element {
                 },
             }
         }
+    }
+}
+
+#[component]
+fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
+    match state {
+        UpdateState::Available(info) => rsx! {
+            div { class: "update-banner update-banner--available",
+                span { class: "update-banner__text",
+                    "▲ {info.latest_version} available"
+                    if !info.release_notes.is_empty() {
+                        span { class: "update-banner__notes", " — {info.release_notes}" }
+                    }
+                }
+                button {
+                    class: "update-banner__btn",
+                    onclick: move |_| on_update.call(()),
+                    "[ UPDATE NOW ]"
+                }
+            }
+        },
+        UpdateState::Downloading(pct) => rsx! {
+            div { class: "update-banner update-banner--downloading",
+                span { class: "update-banner__text", "⬇ Downloading update... {pct}%" }
+                div { class: "update-banner__bar-wrap",
+                    div {
+                        class: "update-banner__bar-fill",
+                        style: "width: {pct}%",
+                    }
+                }
+            }
+        },
+        UpdateState::ReadyToRestart => rsx! {
+            div { class: "update-banner update-banner--ready",
+                span { class: "update-banner__text",
+                    "✓ Update downloaded — restart git-tree to apply"
+                }
+            }
+        },
+        UpdateState::Error(msg) => rsx! {
+            div { class: "update-banner update-banner--error",
+                span { class: "update-banner__text", "✗ Update failed: {msg}" }
+            }
+        },
+        // Checking / Idle — render nothing
+        _ => rsx! {},
     }
 }

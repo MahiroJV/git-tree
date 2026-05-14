@@ -2049,6 +2049,7 @@ dependencies = [
  "chrono",
  "dioxus",
  "dirs 5.0.1",
+ "futures-util",
  "git2",
  "image",
  "openssl",

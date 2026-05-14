@@ -2,7 +2,7 @@
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
-
+use serde::{Deserialize, Serialize};
 // ── Layout constants ──────────────────────────────────────────────────────────
 
 const NODE_RADIUS: f64 = 10.0;
@@ -31,14 +31,14 @@ const FLAT_HALF: f64 = 28.0;
 
 // ── Public enums ──────────────────────────────────────────────────────────────
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum TreeDirection {
     Horizontal,
     Vertical,
 }
 
 /// Controls how branch connector lines are drawn.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum BranchStyle {
     Curved,
     Geometric,

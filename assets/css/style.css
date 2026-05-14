@@ -1180,3 +1180,88 @@ body,
     border: 1px solid #222;
     padding: 1px 5px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UPDATE BANNER — sits above the toolbar, collapses to nothing when idle
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.update-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+    border-bottom: 1px solid transparent;
+}
+
+.update-banner--available {
+    background: rgba(155, 93, 229, 0.12);
+    border-bottom-color: var(--accent);
+    color: var(--accent);
+}
+
+.update-banner--downloading {
+    background: rgba(0, 187, 249, 0.08);
+    border-bottom-color: #00bbf9;
+    color: #00bbf9;
+    gap: 12px;
+}
+
+.update-banner--ready {
+    background: rgba(0, 255, 133, 0.08);
+    border-bottom-color: var(--success);
+    color: var(--success);
+}
+
+.update-banner--error {
+    background: rgba(255, 34, 68, 0.08);
+    border-bottom-color: var(--danger);
+    color: var(--danger);
+}
+
+.update-banner__text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.update-banner__notes {
+    opacity: 0.65;
+}
+
+.update-banner__btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.update-banner__btn:hover {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+/* Progress bar inside the downloading banner */
+.update-banner__bar-wrap {
+    width: 140px;
+    height: 3px;
+    background: rgba(0, 187, 249, 0.2);
+    flex-shrink: 0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.update-banner__bar-fill {
+    height: 100%;
+    background: #00bbf9;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
