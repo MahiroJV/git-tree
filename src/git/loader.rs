@@ -28,7 +28,6 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
     let temp_dir = std::env::temp_dir().join("git-tree-clones");
     std::fs::create_dir_all(&temp_dir)?;
 
-
     let folder_name = url
         .trim_end_matches('/')
         .split('/')
@@ -47,15 +46,15 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
                 match Repository::open(&clone_path) {
                     Ok(r) => r,
                     Err(_) => {
-                        std::fs::remove_dir_all(&clone_path)
-                            .with_context(|| format!("Failed to remove corrupt clone at {:?}", clone_path))?;
+                        std::fs::remove_dir_all(&clone_path).with_context(|| {
+                            format!("Failed to remove corrupt clone at {:?}", clone_path)
+                        })?;
                         RepoBuilder::new()
                             .fetch_options(FetchOptions::new())
                             .clone(&url, &clone_path)
                             .with_context(|| format!("Failed to clone {}", url))?
                     }
                 }
-
             } else {
                 RepoBuilder::new()
                     .fetch_options(FetchOptions::new())
