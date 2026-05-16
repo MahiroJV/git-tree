@@ -28,6 +28,7 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
     let temp_dir = std::env::temp_dir().join("git-tree-clones");
     std::fs::create_dir_all(&temp_dir)?;
 
+
     let folder_name = url
         .trim_end_matches('/')
         .split('/')
@@ -41,9 +42,20 @@ pub fn load_remote(url: &str) -> Result<RepoTree> {
         .stack_size(32 * 1024 * 1024)
         .spawn(move || {
             let clone_path = temp_dir.join(&folder_name);
+            // Main loader thread
             let repo = if clone_path.exists() {
-                Repository::open(&clone_path)
-                    .with_context(|| format!("Failed to open cached clone at {:?}", clone_path))?
+                match Repository::open(&clone_path) {
+                    Ok(r) => r,
+                    Err(_) => {
+                        std::fs::remove_dir_all(&clone_path)
+                            .with_context(|| format!("Failed to remove corrupt clone at {:?}", clone_path))?;
+                        RepoBuilder::new()
+                            .fetch_options(FetchOptions::new())
+                            .clone(&url, &clone_path)
+                            .with_context(|| format!("Failed to clone {}", url))?
+                    }
+                }
+
             } else {
                 RepoBuilder::new()
                     .fetch_options(FetchOptions::new())
