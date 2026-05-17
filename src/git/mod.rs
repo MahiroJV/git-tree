@@ -1,3 +1,4 @@
+pub mod auth;
 pub(crate) mod export;
 pub mod loader;
 pub mod parser;

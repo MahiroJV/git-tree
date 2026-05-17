@@ -1,6 +1,6 @@
+use crate::git::auth::load_token;
 use anyhow::{Context, Result};
 use serde::Deserialize;
-
 // ── API response types ────────────────────────────────────────────────────────
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
@@ -49,12 +49,15 @@ pub async fn search_github(query: &str, limit: u8) -> Result<Vec<SearchResult>> 
         .build()
         .context("Failed to build HTTP client")?;
 
-    let resp = client
+    let mut req = client
         .get(&url)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .context("Network Request failed")?;
+        .header("Accept", "application/vnd.github+json");
+
+    if let Some(token) = load_token() {
+        req = req.header("Authorization", format!("Bearer {}", token.access_token));
+    }
+
+    let resp = req.send().await.context("Network request failed")?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -69,6 +72,7 @@ pub async fn search_github(query: &str, limit: u8) -> Result<Vec<SearchResult>> 
         .json()
         .await
         .context("Failed to parse GitHub response")?;
+
     Ok(data.items)
 }
 

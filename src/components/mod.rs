@@ -6,3 +6,4 @@ pub mod settings;
 pub mod stats;
 pub mod toolbar;
 pub mod tree_canvas;
+pub mod user_repos;

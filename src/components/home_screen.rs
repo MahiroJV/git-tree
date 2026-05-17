@@ -1,9 +1,27 @@
+use crate::components::user_repos::UserRepos;
+use crate::git::auth::{clear_token, load_token, poll_for_token, request_device_code, AuthToken};
 use crate::git::loader;
 use crate::git::parser::RepoTree;
 use crate::git::search::{fmt_stars, search_github, SearchResult};
 use crate::recent;
+use dioxus::document::eval;
 use dioxus::prelude::*;
 use rfd::AsyncFileDialog;
+
+// ── OAuth UI state machine ────────────────────────────────────────────────────
+
+#[derive(Clone, PartialEq)]
+enum OAuthState {
+    Idle,
+    RequestingCode,
+    WaitingForUser {
+        user_code: String,
+        verification_uri: String,
+        device_code: String,
+        interval: u64,
+    },
+    Error(String),
+}
 
 #[derive(Props, Clone, PartialEq)]
 pub struct HomeScreenProps {
@@ -22,7 +40,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut recent_search = use_signal(String::new);
     let mut is_cloning = use_signal(|| false);
 
-    // ── Search state ──────────────────────────────────────────────────────────
     let mut search_input = use_signal(String::new);
 
     #[allow(clippy::redundant_closure)]
@@ -30,14 +47,18 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
 
     let mut is_searching = use_signal(|| false);
     let mut search_error = use_signal(|| Option::<String>::None);
-    let mut cloning_url = use_signal(|| Option::<String>::None); // which result is cloning
+    let mut cloning_url = use_signal(|| Option::<String>::None);
+
+    #[allow(clippy::redundant_closure)]
+    let mut auth_token: Signal<Option<AuthToken>> = use_signal(|| load_token());
+    let mut oauth_state = use_signal(|| OAuthState::Idle);
 
     #[allow(clippy::redundant_closure)]
     let mut recent_repos = use_signal(|| recent::load_recent());
 
     let displayed_error = local_error.read().clone().or(props.initial_error.clone());
 
-    // ── Open local ────────────────────────────────────────────────────────────
+    // ── Open local ────────────────────────────────────────────────────────
     let mut open_local = move |path_str: String| {
         if path_str.is_empty() {
             local_error.set(Some("Please enter a path.".into()));
@@ -55,7 +76,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
         }
     };
 
-    // ── Filtered recents ──────────────────────────────────────────────────────
+    // ── Filtered recents ──────────────────────────────────────────────────
     let filtered_recents = use_memo(move || {
         let q = recent_search.read().to_lowercase();
         recent_repos
@@ -70,17 +91,24 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             .collect::<Vec<_>>()
     });
 
-    // ── Clone a URL (used for remote tab AND search results) ──────────────────
+    // ── Clone a URL ───────────────────────────────────────────────────────
     let mut clone_url_fn = move |url: String, display_name: String| {
         local_error.set(None);
         search_error.set(None);
         cloning_url.set(Some(url.clone()));
         is_cloning.set(true);
 
+        let token = auth_token.read().clone();
+        let clone_url = if let Some(ref t) = token {
+            inject_token_into_url(&url, &t.access_token)
+        } else {
+            url.clone()
+        };
+
         spawn(async move {
             let (tx, rx) = tokio::sync::oneshot::channel();
             std::thread::spawn(move || {
-                let result = loader::load_remote(&url);
+                let result = loader::load_remote(&clone_url);
                 let _ = tx.send(result);
             });
 
@@ -116,7 +144,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             h1 { class: "ascii-header", "GIT-TREE" }
             p  { class: "home-tagline", "VISUALIZE YOUR GIT HISTORY — TERMINAL STYLE" }
 
-            // ── Tab bar ───────────────────────────────────────────────────────
+            // ── Tab bar ───────────────────────────────────────────────────
             div {
                 class: "tab-bar",
                 button {
@@ -134,12 +162,20 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     onclick: move |_| tab.set("search"),
                     "[ SEARCH ONLINE ]"
                 }
+                // MY REPOS tab — only visible when logged in
+                if auth_token.read().is_some() {
+                    button {
+                        class: if *tab.read() == "myrepos" { "tab tab-active" } else { "tab" },
+                        style: "color: var(--success);",
+                        onclick: move |_| tab.set("myrepos"),
+                        "[ MY REPOS ]"
+                    }
+                }
             }
 
-            // ── Tab content ───────────────────────────────────────────────────
             div { class: "home-form",
 
-                // ── LOCAL ─────────────────────────────────────────────────────
+                // ── LOCAL ─────────────────────────────────────────────────
                 if *tab.read() == "local" {
                     div { class: "input-group",
                         span { class: "prompt", "> PATH:" }
@@ -188,7 +224,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     }
                 }
 
-                // ── REMOTE ────────────────────────────────────────────────────
+                // ── REMOTE ────────────────────────────────────────────────
                 if *tab.read() == "remote" {
                     div { class: "input-group",
                         span { class: "prompt", "> URL:" }
@@ -226,9 +262,228 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     }
                 }
 
-                // ── SEARCH ONLINE ─────────────────────────────────────────────
+                // ── SEARCH ONLINE ─────────────────────────────────────────
                 if *tab.read() == "search" {
-                    // Search input row
+                    {
+                        let token_read = auth_token.read().clone();
+                        let state_read = oauth_state.read().clone();
+
+                        rsx! {
+                            div {
+                                style: "width: 100%; max-width: 580px; \
+                                        display: flex; flex-direction: column; gap: 8px;",
+
+                                // Logged in banner
+                                if let Some(ref token) = token_read {
+                                    div {
+                                        style: "display: flex; align-items: center; \
+                                                gap: 12px; padding: 8px 14px; \
+                                                border: 1px solid var(--success); \
+                                                background: rgba(0,255,133,0.05); \
+                                                font-size: 10px; letter-spacing: 0.1em;",
+                                        span {
+                                            style: "color: var(--success); flex: 1;",
+                                            "● GITHUB"
+                                            if let Some(ref u) = token.username {
+                                                span { style: "color: var(--text);", " @{u}" }
+                                            }
+                                            span {
+                                                style: "color: var(--text-muted); margin-left: 8px;",
+                                                "5 000 req/h"
+                                            }
+                                        }
+                                        button {
+                                            class: "btn-primary",
+                                            style: "font-size: 9px; padding: 4px 10px; \
+                                                    border-color: var(--danger); \
+                                                    color: var(--danger);",
+                                            onclick: move |_| {
+                                                clear_token();
+                                                auth_token.set(None);
+                                                oauth_state.set(OAuthState::Idle);
+                                                // If on myrepos tab, go back to search
+                                                if *tab.read() == "myrepos" {
+                                                    tab.set("search");
+                                                }
+                                            },
+                                            "[ SIGN OUT ]"
+                                        }
+                                    }
+                                }
+
+                                // Not logged in idle
+                                if token_read.is_none() && state_read == OAuthState::Idle {
+                                    div {
+                                        style: "display: flex; align-items: center; \
+                                                gap: 12px; padding: 8px 14px; \
+                                                border: 1px solid var(--border); \
+                                                font-size: 10px; letter-spacing: 0.08em;",
+                                        span {
+                                            style: "color: var(--text-muted); flex: 1;",
+                                            "Sign in for private repos + higher rate limits"
+                                        }
+                                        button {
+                                            class: "btn-primary",
+                                            style: "font-size: 9px; padding: 4px 10px;",
+                                            onclick: move |_| {
+                                                oauth_state.set(OAuthState::RequestingCode);
+                                                spawn(async move {
+                                                    match request_device_code().await {
+                                                        Ok(start) => {
+                                                            let _ = webbrowser::open(
+                                                                &start.verification_uri
+                                                            );
+                                                            let device_code = start.device_code.clone();
+                                                            let interval = start.interval;
+                                                            oauth_state.set(OAuthState::WaitingForUser {
+                                                                user_code: start.user_code,
+                                                                verification_uri: start.verification_uri,
+                                                                device_code: start.device_code,
+                                                                interval: start.interval,
+                                                            });
+                                                            spawn(async move {
+                                                                match poll_for_token(device_code, interval).await {
+                                                                    Ok(token) => {
+                                                                        auth_token.set(Some(token));
+                                                                        oauth_state.set(OAuthState::Idle);
+                                                                    }
+                                                                    Err(e) => {
+                                                                        oauth_state.set(OAuthState::Error(e.to_string()));
+                                                                    }
+                                                                }
+                                                            });
+                                                        }
+                                                        Err(e) => {
+                                                            oauth_state.set(OAuthState::Error(e.to_string()));
+                                                        }
+                                                    }
+                                                });
+                                            },
+                                            "[ SIGN IN WITH GITHUB ]"
+                                        }
+                                    }
+                                }
+
+                                // Requesting code spinner
+                                if token_read.is_none() && state_read == OAuthState::RequestingCode {
+                                    div {
+                                        style: "padding: 8px 14px; border: 1px solid var(--border); \
+                                                font-size: 10px; color: var(--text-muted); \
+                                                letter-spacing: 0.1em;",
+                                        "> contacting GitHub "
+                                        span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                                    }
+                                }
+
+                                // Waiting for user — show code
+                                if let OAuthState::WaitingForUser {
+                                    ref user_code,
+                                    ref verification_uri,
+                                    ..
+                                } = state_read {
+                                    if token_read.is_none() {
+                                        {
+                                            let code  = user_code.clone();
+                                            let uri   = verification_uri.clone();
+                                            let code_c = code.clone();
+                                            let uri_c  = uri.clone();
+                                            rsx! {
+                                                div {
+                                                    style: "display: flex; flex-direction: column; \
+                                                            gap: 10px; padding: 16px 14px; \
+                                                            border: 1px solid var(--accent); \
+                                                            background: rgba(155,93,229,0.06);",
+                                                    div {
+                                                        style: "font-size: 10px; color: var(--text-muted); \
+                                                                letter-spacing: 0.1em;",
+                                                        "1. Browser opened → go to "
+                                                        span { style: "color: var(--accent);", "{uri}" }
+                                                    }
+                                                    div {
+                                                        style: "display: flex; align-items: center; gap: 12px;",
+                                                        div {
+                                                            style: "font-size: 24px; font-weight: 700; \
+                                                                    letter-spacing: 0.3em; color: var(--accent); \
+                                                                    border: 2px solid var(--accent); \
+                                                                    padding: 10px 20px;",
+                                                            "{code}"
+                                                        }
+                                                        button {
+                                                            class: "btn-primary",
+                                                            style: "font-size: 9px; padding: 4px 10px;",
+                                                            onclick: move |_| {
+                                                                eval(&format!(
+                                                                    "navigator.clipboard.writeText('{}')",
+                                                                    code_c
+                                                                ));
+                                                            },
+                                                            "⊞ COPY"
+                                                        }
+                                                    }
+                                                    div {
+                                                        style: "font-size: 10px; color: var(--text-muted); \
+                                                                letter-spacing: 0.1em;",
+                                                        "2. Enter the code above → click "
+                                                        span { style: "color: var(--success);", "Authorize" }
+                                                        " → come back here"
+                                                    }
+                                                    div {
+                                                        style: "font-size: 10px; color: var(--text-muted); \
+                                                                display: flex; align-items: center; gap: 6px;",
+                                                        span { class: "loading-blink", style: "font-size: 12px;", "█" }
+                                                        "waiting for authorization..."
+                                                    }
+                                                    div {
+                                                        style: "display: flex; gap: 8px;",
+                                                        button {
+                                                            class: "btn-primary",
+                                                            style: "font-size: 9px; padding: 4px 10px;",
+                                                            onclick: move |_| { let _ = webbrowser::open(&uri_c); },
+                                                            "↗ REOPEN BROWSER"
+                                                        }
+                                                        button {
+                                                            class: "btn-primary",
+                                                            style: "font-size: 9px; padding: 4px 10px; \
+                                                                    border-color: var(--danger); \
+                                                                    color: var(--danger);",
+                                                            onclick: move |_| oauth_state.set(OAuthState::Idle),
+                                                            "[ CANCEL ]"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // OAuth error
+                                if let OAuthState::Error(ref msg) = state_read {
+                                    if token_read.is_none() {
+                                        {
+                                            let msg = msg.clone();
+                                            rsx! {
+                                                div {
+                                                    style: "display: flex; align-items: center; \
+                                                            gap: 12px; padding: 8px 14px; \
+                                                            border: 1px solid var(--danger); \
+                                                            font-size: 10px;",
+                                                    span { style: "color: var(--danger); flex: 1;", "✗ {msg}" }
+                                                    button {
+                                                        class: "btn-primary",
+                                                        style: "font-size: 9px; padding: 4px 10px;",
+                                                        onclick: move |_| oauth_state.set(OAuthState::Idle),
+                                                        "[ RETRY ]"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Search input
                     div { class: "input-group",
                         span { class: "prompt", "> QUERY:" }
                         input {
@@ -247,14 +502,8 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                     is_searching.set(true);
                                     spawn(async move {
                                         match search_github(&q, 15).await {
-                                            Ok(results) => {
-                                                search_results.set(results);
-                                                is_searching.set(false);
-                                            }
-                                            Err(e) => {
-                                                search_error.set(Some(e.to_string()));
-                                                is_searching.set(false);
-                                            }
+                                            Ok(results) => { search_results.set(results); is_searching.set(false); }
+                                            Err(e) => { search_error.set(Some(e.to_string())); is_searching.set(false); }
                                         }
                                     });
                                 }
@@ -271,14 +520,8 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                 is_searching.set(true);
                                 spawn(async move {
                                     match search_github(&q, 15).await {
-                                        Ok(results) => {
-                                            search_results.set(results);
-                                            is_searching.set(false);
-                                        }
-                                        Err(e) => {
-                                            search_error.set(Some(e.to_string()));
-                                            is_searching.set(false);
-                                        }
+                                        Ok(results) => { search_results.set(results); is_searching.set(false); }
+                                        Err(e) => { search_error.set(Some(e.to_string())); is_searching.set(false); }
                                     }
                                 });
                             },
@@ -286,7 +529,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         }
                     }
 
-                    // Searching spinner
                     if *is_searching.read() {
                         div {
                             class: "loading-cursor",
@@ -296,12 +538,10 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         }
                     }
 
-                    // Search error
                     if let Some(err) = search_error.read().clone() {
                         p { class: "error-msg", "! {err}" }
                     }
 
-                    // Cloning indicator (search tab)
                     if *is_cloning.read() {
                         if let Some(url) = cloning_url.read().clone() {
                             div {
@@ -313,103 +553,66 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         }
                     }
 
-                    // Results list
                     if !search_results.read().is_empty() {
                         div { class: "search-results-header",
                             span {
-                                style: "font-size: 10px; color: var(--text-muted); \
-                                        letter-spacing: 0.15em;",
+                                style: "font-size: 10px; color: var(--text-muted); letter-spacing: 0.15em;",
                                 "— {search_results.read().len()} RESULTS —"
                             }
                         }
-
                         div { class: "search-results-list",
                             for result in search_results.read().clone() {
                                 {
                                     let clone_url   = result.clone_url.clone();
                                     let repo_name   = result.full_name.clone();
-                                    let is_this_one = cloning_url.read()
-                                        .as_deref() == Some(&clone_url);
+                                    let is_this_one = cloning_url.read().as_deref() == Some(&clone_url);
                                     let disabled    = *is_cloning.read();
                                     let stars_fmt   = fmt_stars(result.stargazers_count);
                                     let forks_fmt   = fmt_stars(result.forks_count);
-                                    let lang        = result.language.clone()
-                                        .unwrap_or_else(|| "—".to_string());
-                                    let desc        = result.description.clone()
-                                        .unwrap_or_default();
-                                    let license     = result.license.as_ref()
-                                        .and_then(|l| l.spdx_id.clone())
-                                        .unwrap_or_default();
-                                    let topics      = result.topics.clone()
-                                        .unwrap_or_default();
-                                    let cu2         = clone_url.clone();
-                                    let rn2         = repo_name.clone();
+                                    let lang = result.language.clone().unwrap_or_else(|| "—".to_string());
+                                    let desc = result.description.clone().unwrap_or_default();
+                                    let license = result.license.as_ref()
+                                        .and_then(|l| l.spdx_id.clone()).unwrap_or_default();
+                                    let topics = result.topics.clone().unwrap_or_default();
+                                    let cu2 = clone_url.clone();
+                                    let rn2 = repo_name.clone();
 
                                     rsx! {
                                         div {
                                             class: "search-result-card",
                                             key: "{clone_url}",
-
-                                            // ── Top row: name + action ────
                                             div { class: "search-result-top",
-                                                span { class: "search-result-name",
-                                                    "{repo_name}"
-                                                }
+                                                span { class: "search-result-name", "{repo_name}" }
                                                 button {
                                                     class: if is_this_one {
-                                                        "btn-primary search-clone-btn \
-                                                         search-clone-btn--active"
-                                                    } else {
-                                                        "btn-primary search-clone-btn"
-                                                    },
+                                                        "btn-primary search-clone-btn search-clone-btn--active"
+                                                    } else { "btn-primary search-clone-btn" },
                                                     disabled: disabled,
-                                                    onclick: move |_| {
-                                                        clone_url_fn(cu2.clone(), rn2.clone());
-                                                    },
-                                                    if is_this_one { "CLONING..." }
-                                                    else           { "CLONE →" }
+                                                    onclick: move |_| clone_url_fn(cu2.clone(), rn2.clone()),
+                                                    if is_this_one { "CLONING..." } else { "CLONE →" }
                                                 }
                                             }
-
-                                            // ── Description ───────────────
                                             if !desc.is_empty() {
                                                 p { class: "search-result-desc", "{desc}" }
                                             }
-
-                                            // ── Topics ────────────────────
                                             if !topics.is_empty() {
                                                 div { class: "search-result-topics",
                                                     for topic in topics.iter().take(5) {
-                                                        span {
-                                                            class: "search-topic-badge",
-                                                            key: "{topic}",
-                                                            "{topic}"
-                                                        }
+                                                        span { class: "search-topic-badge", key: "{topic}", "{topic}" }
                                                     }
                                                 }
                                             }
-
-                                            // ── Meta row: lang/stars/forks/license ──
                                             div { class: "search-result-meta",
                                                 if lang != "—" {
                                                     span { class: "search-meta-item",
-                                                        span {
-                                                            class: "search-meta-lang-dot",
-                                                            "●"
-                                                        }
+                                                        span { class: "search-meta-lang-dot", "●" }
                                                         " {lang}"
                                                     }
                                                 }
-                                                span { class: "search-meta-item",
-                                                    "★ {stars_fmt}"
-                                                }
-                                                span { class: "search-meta-item",
-                                                    "⑂ {forks_fmt}"
-                                                }
+                                                span { class: "search-meta-item", "★ {stars_fmt}" }
+                                                span { class: "search-meta-item", "⑂ {forks_fmt}" }
                                                 if !license.is_empty() && license != "NOASSERTION" {
-                                                    span { class: "search-meta-item search-meta-license",
-                                                        "{license}"
-                                                    }
+                                                    span { class: "search-meta-item search-meta-license", "{license}" }
                                                 }
                                             }
                                         }
@@ -420,16 +623,27 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     }
                 }
 
-                // ── Shared error (local / remote tabs) ────────────────────────
-                if *tab.read() != "search" {
+                // ── MY REPOS ──────────────────────────────────────────────
+                if *tab.read() == "myrepos" {
+                    if let Some(ref token) = auth_token.read().clone() {
+                        UserRepos {
+                            token: token.access_token.clone(),
+                            on_load: props.on_load,
+                            on_loading: props.on_loading,
+                        }
+                    }
+                }
+
+                // Shared error for local/remote tabs
+                if *tab.read() != "search" && *tab.read() != "myrepos" {
                     if let Some(err) = &displayed_error {
                         p { class: "error-msg", "! {err}" }
                     }
                 }
             }
 
-            // ── Recent repos — only on local/remote tabs ──────────────────────
-            if *tab.read() != "search" {
+            // Recent repos — only on local/remote tabs
+            if *tab.read() == "local" || *tab.read() == "remote" {
                 div { class: "recent-section",
                     p { class: "recent-title", "— RECENT REPOS —" }
 
@@ -467,14 +681,8 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                             class: "recent-item",
                                             onclick: move |_| open_local(path_str.clone()),
                                             span { class: "recent-item-name",  "{repo.name}" }
-                                            span {
-                                                class: "recent-item-path text-muted",
-                                                "{repo.path}"
-                                            }
-                                            span {
-                                                class: "recent-item-time text-muted",
-                                                "{repo.opened_at}"
-                                            }
+                                            span { class: "recent-item-path text-muted", "{repo.path}" }
+                                            span { class: "recent-item-time text-muted", "{repo.opened_at}" }
                                         }
                                     }
                                 }
@@ -485,8 +693,16 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
             }
 
             div { class: "home-footer",
-                span { class: "text-muted", "git-tree v0.2 · built with Rust + Dioxus" }
+                span { class: "text-muted", "git-tree v0.4 · built with Rust + Dioxus" }
             }
         }
+    }
+}
+
+fn inject_token_into_url(url: &str, token: &str) -> String {
+    if url.starts_with("https://") {
+        url.replacen("https://", &format!("https://{}@", token), 1)
+    } else {
+        url.to_string()
     }
 }

@@ -16,7 +16,7 @@ exclude = ["assets/fonts/*.ttf", ".idea/"]
 dioxus = { version = "0.6", features = ["desktop"] }
 rfd = "0.17.2"
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
-tokio = { version = "1.52.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.52.0", features = ["rt-multi-thread", "time"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
