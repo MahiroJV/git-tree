@@ -249,13 +249,13 @@ dx build --platform desktop --release
 - [x] GitHub repository search + one-click clone
 - [x] Curved and geometric branch connector styles
 - [x] 4 extra themes (Tokyo Night, Cappuccino Mocha, Rose Pine, Everforest)
-- [ ] Export tree as SVG or PNG
+- [x] Export tree as SVG or PNG
 
 ---
 
 ### 🖥️ v0.4 — Platform
-- [ ] GitHub OAuth login (private repo access)
-- [ ] Windows installer (MSI via cargo-wix)
+- [x] GitHub OAuth login (private repo access)
+- [x] Windows installer (MSI via cargo-wix)
 - [ ] macOS build
 - [ ] Linux Flatpak / Snap packaging
 
@@ -278,6 +278,7 @@ src/
 ├── recent.rs               # Recent repos persistence (~/.config/git-tree/)
 ├── components/
 │   ├── home_screen.rs      # Repo open/clone/search screen + recent list
+│   ├── user_repos.rs       # user private/public profile repos
 │   ├── toolbar.rs          # Top navigation + search bar
 │   ├── tree_canvas.rs      # SVG tree (horizontal + vertical + minimap)
 │   ├── left_panel.rs       # Commit details + copy hash
@@ -289,6 +290,8 @@ src/
     ├── loader.rs           # Open local / clone remote
     ├── parser.rs           # Git history → tree data structures
     ├── search.rs           # GitHub API search
+    ├── auth.rs             # Github OAuth login
+    ├── export.rs           # img/svg export
     └── url.rs              # Remote URL → browser URL conversion
 
 assets/
