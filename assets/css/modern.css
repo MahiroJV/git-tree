@@ -1,0 +1,502 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODERN STYLE — Linear-inspired overrides
+   Everything here is scoped under .style-modern so it only fires when the
+   user picks "Modern" in Settings. Terminal style is the untouched baseline.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── CSS custom props available in Modern mode ── */
+.style-modern {
+    --font:      system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --radius:    7px;
+    --radius-lg: 12px;
+}
+
+/* Switch every element to system font, then carve out the monospace exceptions */
+.style-modern * {
+    font-family: var(--font);
+}
+
+.style-modern .commit-message-box,
+.style-modern .diffview-hunk,
+.style-modern .dv-line-text,
+.style-modern .hash,
+.style-modern .commit-hash-row,
+.style-modern .commit-field-value--accent,
+.style-modern .toolbar-search-prompt,
+.style-modern .prompt,
+.style-modern .ascii-header {
+    font-family: 'Space Mono', 'Courier New', monospace;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.style-modern .toolbar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+    padding: 0 24px;
+    gap: 16px;
+}
+
+.style-modern .toolbar-brand {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+.style-modern .toolbar-btn {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    padding: 5px 14px;
+    color: rgba(255, 255, 255, 0.45);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.style-modern .toolbar-btn:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+.style-modern .toolbar-btn-accent {
+    color: var(--accent);
+    border-color: rgba(94, 106, 210, 0.35);
+}
+.style-modern .toolbar-btn-accent:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.style-modern .toolbar-search-wrap {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    max-width: 380px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.style-modern .toolbar-search-wrap:focus-within {
+    border-color: rgba(94, 106, 210, 0.5);
+    background: rgba(94, 106, 210, 0.03);
+}
+
+.style-modern .toolbar-search-input {
+    font-size: 13px;
+    letter-spacing: 0;
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+
+.style-modern .panel-left {
+    border-right: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.style-modern .panel.right-panel,
+.style-modern .right-panel--collapsed {
+    border-left: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.style-modern .panel-header {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.22);
+    padding: 16px 16px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+/* ── Left panel fields ───────────────────────────────────────────────────── */
+
+.style-modern .commit-field-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.28);
+    padding: 10px 16px 2px;
+}
+
+.style-modern .commit-field-value {
+    font-size: 13px;
+    padding: 0 16px 6px;
+    letter-spacing: 0;
+}
+
+.style-modern .commit-message-box {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0 16px 16px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.style-modern .copy-hash-btn {
+    border-radius: 5px;
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.style-modern .commit-tag {
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+/* ── Right panel ─────────────────────────────────────────────────────────── */
+
+.style-modern .diff-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+}
+
+.style-modern .diff-view-btn {
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    transition: background 0.15s, color 0.15s;
+}
+.style-modern .diff-view-btn:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.style-modern .diff-file-status {
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.style-modern .diff-file-path {
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+/* ── Home screen ─────────────────────────────────────────────────────────── */
+
+.style-modern .home-screen {
+    gap: 22px;
+}
+
+.style-modern .ascii-header {
+    font-size: 54px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    -webkit-text-stroke: 0;
+    color: var(--accent);
+}
+
+.style-modern .home-tagline {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+}
+
+.style-modern .tab-bar {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.style-modern .tab {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    padding: 9px 18px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.style-modern .tab-active {
+    background: rgba(94, 106, 210, 0.1);
+    color: var(--accent) !important;
+}
+
+.style-modern .input-group {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: border-color 0.15s;
+}
+.style-modern .input-group:focus-within {
+    border-color: rgba(94, 106, 210, 0.5);
+}
+
+.style-modern .terminal-input {
+    font-size: 13px;
+    letter-spacing: 0;
+}
+
+.style-modern .btn-primary {
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    padding: 7px 16px;
+    transition: background 0.15s, color 0.15s;
+}
+.style-modern .btn-primary:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.style-modern .recent-item {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: border-color 0.15s, background 0.15s;
+}
+.style-modern .recent-item:hover {
+    border-color: rgba(94, 106, 210, 0.25);
+    background: rgba(94, 106, 210, 0.04);
+}
+
+.style-modern .recent-item-name {
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
+.style-modern .recent-item-path,
+.style-modern .recent-item-time {
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.style-modern .recent-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+}
+
+.style-modern .home-footer {
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+/* ── Search results ──────────────────────────────────────────────────────── */
+
+.style-modern .search-result-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: border-color 0.15s, background 0.15s;
+}
+.style-modern .search-result-card:hover {
+    border-color: rgba(94, 106, 210, 0.25);
+    background: rgba(94, 106, 210, 0.03);
+}
+
+.style-modern .search-result-name {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.style-modern .search-result-desc {
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
+.style-modern .search-topic-badge {
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+.style-modern .search-meta-item {
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.style-modern .search-clone-btn {
+    border-radius: var(--radius);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* ── Settings screen ─────────────────────────────────────────────────────── */
+
+.style-modern .settings-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: none;
+}
+
+.style-modern .section-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+}
+
+.style-modern .back-btn {
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.style-modern .theme-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: border-color 0.15s;
+}
+.style-modern .theme-card:hover {
+    border-color: rgba(94, 106, 210, 0.4);
+}
+.style-modern .theme-card-active {
+    border-color: var(--accent) !important;
+}
+
+.style-modern .theme-name {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.style-modern .option-btn {
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.style-modern .setting-label-title {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+.style-modern .setting-label-value {
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+/* ── Style picker cards in Settings ──────────────────────────────────────── */
+
+.style-modern .style-picker-card {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+.style-modern .style-picker-card:hover {
+    border-color: rgba(94, 106, 210, 0.4);
+}
+.style-modern .style-picker-card--active {
+    background: rgba(94, 106, 210, 0.06);
+}
+.style-modern .style-picker-card {
+    border-radius: var(--radius-lg);
+}
+
+.style-modern .style-picker-preview {
+    border-radius: var(--radius);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.style-modern .style-picker-name {
+    letter-spacing: 0.02em;
+    font-weight: 600;
+}
+
+.style-modern .style-picker-sub {
+    letter-spacing: 0;
+    font-size: 11px;
+}
+
+.style-modern .style-picker-badge {
+    border-radius: 4px;
+    letter-spacing: 0;
+    font-size: 10px;
+}
+
+/* ── Diff viewer ─────────────────────────────────────────────────────────── */
+
+.style-modern .diffview-back-btn {
+    border-radius: var(--radius);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.style-modern .diffview-fold-btn {
+    border-radius: var(--radius);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.style-modern .diffview-file-badge {
+    border-radius: 4px;
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 600;
+}
+
+.style-modern .diffview-file-path {
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
+/* ── Stats screen ────────────────────────────────────────────────────────── */
+
+.style-modern .stats-summary-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.style-modern .stats-card-value {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.style-modern .stats-card-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+}
+
+.style-modern .leaderboard-row {
+    border-radius: var(--radius);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    transition: border-color 0.15s;
+}
+.style-modern .leaderboard-row:hover {
+    border-color: rgba(94, 106, 210, 0.2);
+}
+
+.style-modern .lb-name {
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
+.style-modern .lb-email,
+.style-modern .lb-count,
+.style-modern .lb-share {
+    letter-spacing: 0;
+}
+
+/* ── Update banner ───────────────────────────────────────────────────────── */
+
+.style-modern .update-banner {
+    font-size: 12px;
+    letter-spacing: 0;
+}
+
+.style-modern .update-banner__btn {
+    border-radius: var(--radius);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* ── Loading screen ──────────────────────────────────────────────────────── */
+
+.style-modern .loading-cursor {
+    letter-spacing: 0.04em;
+}

@@ -1,6 +1,7 @@
 pub(crate) mod diff_viewer;
 pub mod home_screen;
 pub mod left_panel;
+pub mod onboarding;
 pub mod right_panel;
 pub mod settings;
 pub mod stats;

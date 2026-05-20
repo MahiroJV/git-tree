@@ -2,6 +2,7 @@ use crate::components::{
     diff_viewer::DiffViewer,
     home_screen::HomeScreen,
     left_panel::LeftPanel,
+    onboarding::OnboardingScreen,
     right_panel::RightPanel,
     settings::Settings,
     stats::StatsScreen,
@@ -12,12 +13,15 @@ use crate::git::export::generate_svg;
 use crate::git::loader::load_commit_diff;
 use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
-use crate::settings_store::{load_settings, save_settings, AppSettings};
+use crate::settings_store::{load_settings, save_settings, AppSettings, AppStyle};
 use crate::theme::theme_by_name;
 use crate::updater::{check_for_updates, download_and_apply, UpdateInfo};
 use dioxus::prelude::*;
 
 const BASE_CSS: &str = include_str!("../assets/css/style.css");
+const MODERN_CSS: &str = include_str!("../assets/css/modern.css");
+
+// ── Screen enum ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, PartialEq)]
 pub enum Screen {
@@ -29,33 +33,35 @@ pub enum Screen {
     Diff(Box<CommitNode>),
 }
 
+// ── Update state ──────────────────────────────────────────────────────────────
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum UpdateState {
-    /// Background check still running (or not started yet)
     Checking,
-    /// No update / check failed silently
     Idle,
-    /// A new version is available — show the banner
     Available(UpdateInfo),
-    /// Download in progress; u8 is 0-100 percent
     Downloading(u8),
-    /// Download done — ask user to restart
     ReadyToRestart,
-    /// Something went wrong
     Error(String),
 }
+
+// ── Root component ────────────────────────────────────────────────────────────
 
 #[component]
 pub fn App() -> Element {
     let saved = load_settings();
 
+    // ── Onboarding gate ───────────────────────────────────────────────────
+    // Separate signal so we can dismiss the overlay without a full remount.
+    let mut onboarding_done = use_signal(|| saved.onboarding_done);
+
+    // ── App signals seeded from disk ──────────────────────────────────────
     let mut screen = use_signal(|| Screen::Home);
     let mut repo_tree: Signal<Option<RepoTree>> = use_signal(|| None);
     let mut selected_commit: Signal<Option<CommitNode>> = use_signal(|| None);
     let mut clone_error = use_signal(|| Option::<String>::None);
     let mut diff_loading = use_signal(|| false);
 
-    // ── Settings signals seeded from disk ─────────────────────────────────
     let mut theme_name = use_signal(|| saved.theme_name.clone());
     let mut font_size = use_signal(|| saved.font_size);
     let mut node_spacing = use_signal(|| saved.node_spacing);
@@ -63,6 +69,7 @@ pub fn App() -> Element {
     let mut crt_overlay = use_signal(|| saved.crt_overlay);
     let mut tree_direction = use_signal(|| saved.tree_direction.clone());
     let mut branch_style = use_signal(|| saved.branch_style.clone());
+    let mut app_style = use_signal(|| saved.app_style.clone());
 
     let current_settings = move || AppSettings {
         theme_name: theme_name.read().clone(),
@@ -72,22 +79,22 @@ pub fn App() -> Element {
         crt_overlay: *crt_overlay.read(),
         tree_direction: tree_direction.read().clone(),
         branch_style: branch_style.read().clone(),
+        app_style: app_style.read().clone(),
+        onboarding_done: *onboarding_done.read(),
     };
 
     let mut search_query = use_signal(String::new);
     let mut left_open = use_signal(|| true);
     let mut right_open = use_signal(|| true);
 
-    // ── Update state ──────────────────────────────────────────────────────
+    // ── Update state ───────────────────────────────────────────────────────
     let mut update_state: Signal<UpdateState> = use_signal(|| UpdateState::Checking);
 
-    // Kick off the background update check once, right after mount.
     use_effect(move || {
         spawn(async move {
             match check_for_updates().await {
                 Ok(Some(info)) => update_state.set(UpdateState::Available(info)),
-                Ok(None) => update_state.set(UpdateState::Idle),
-                Err(_) => update_state.set(UpdateState::Idle), // silent fail
+                _ => update_state.set(UpdateState::Idle),
             }
         });
     });
@@ -104,10 +111,10 @@ pub fn App() -> Element {
         >,
     > = use_signal(std::collections::HashMap::new);
 
+    // ── Theme CSS (derived from signals) ───────────────────────────────────
     let theme_css = use_memo(move || {
         let t = theme_by_name(&theme_name.read());
         let fs = *font_size.read();
-        let _z = *zoom.read();
         format!(
             ":root {{ \
                 --bg:{bg}; --bg-secondary:{bgs}; --text:{text}; \
@@ -128,7 +135,7 @@ pub fn App() -> Element {
         )
     });
 
-    //SVG
+    // ── SVG export ─────────────────────────────────────────────────────────
     let handle_export = move |_| {
         let maybe_tree = repo_tree.read().clone();
         let spacing_s = *node_spacing.read();
@@ -138,7 +145,6 @@ pub fn App() -> Element {
 
         if let Some(tree) = maybe_tree {
             let svg_content = generate_svg(&tree, spacing_s, merges, &direction, &style);
-
             spawn(async move {
                 let file = rfd::AsyncFileDialog::new()
                     .set_title("Export tree as SVG")
@@ -146,82 +152,98 @@ pub fn App() -> Element {
                     .set_file_name("git-tree-export.svg")
                     .save_file()
                     .await;
-
                 if let Some(handle) = file {
                     let _ = handle.write(svg_content.as_bytes()).await;
                 }
             });
         }
     };
+
+    // ── Root CSS class — drives Terminal vs Modern overrides ───────────────
+    let root_style_class = use_memo(move || app_style.read().css_class());
+    //let root_style_class = move || app_style.read().css_class();
+
     rsx! {
         style { "{BASE_CSS}" }
+        style { "{MODERN_CSS}" }
         style { "{theme_css}" }
 
         div {
-            class: "app-root",
-            style: "width: calc(100vw / var(--zoom)); \
-            height: calc(100vh / var(--zoom)); \
-            transform: scale(var(--zoom)); \
-            transform-origin: top left;",
+            class: format!("app-root {}", root_style_class.read()),
+            style: "
+                width: calc(100vw / var(--zoom));
+                height: calc(100vh / var(--zoom));
+                transform: scale(var(--zoom));
+                transform-origin: top left;
+                position: relative;
+            ",
 
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }
             }
 
-            // ── Update banner (shown on every screen) ─────────────────────
-            UpdateBanner { state: update_state.read().clone(), on_update: move |_| {
-                let state = update_state.read().clone();
-                if let UpdateState::Available(info) = state {
-                    let url = info.download_url.clone();
-                    update_state.set(UpdateState::Downloading(0));
-                    spawn(async move {
-                        // Create a watch channel so we can stream progress into the signal.
-                        let (tx, mut rx) = tokio::sync::watch::channel(0u8);
-                        let url2 = url.clone();
-                        let mut dl = tokio::spawn(async move {
-                            download_and_apply(&url2, Some(tx)).await
-                        });
-                        // Poll progress while download runs.
-                        loop {
-                            tokio::select! {
-                                _ = rx.changed() => {
-                                    update_state.set(UpdateState::Downloading(*rx.borrow()));
-                                }
-                                result = &mut dl => {
-                                    match result {
-                                        Ok(Ok(())) => update_state.set(UpdateState::ReadyToRestart),
-                                        Ok(Err(e)) => update_state.set(UpdateState::Error(e.to_string())),
-                                        Err(_)     => update_state.set(UpdateState::Error("Download task panicked".into())),
+            // ── Update banner — shown on all screens ───────────────────────
+            UpdateBanner {
+                state: update_state.read().clone(),
+                on_update: move |_| {
+                    let state = update_state.read().clone();
+                    if let UpdateState::Available(info) = state {
+                        let url = info.download_url.clone();
+                        update_state.set(UpdateState::Downloading(0));
+                        spawn(async move {
+                            let (tx, mut rx) = tokio::sync::watch::channel(0u8);
+                            let url2 = url.clone();
+                            let mut dl = tokio::spawn(async move {
+                                download_and_apply(&url2, Some(tx)).await
+                            });
+                            loop {
+                                tokio::select! {
+                                    _ = rx.changed() => {
+                                        update_state.set(UpdateState::Downloading(*rx.borrow()));
                                     }
-                                    break;
+                                    result = &mut dl => {
+                                        match result {
+                                            Ok(Ok(())) =>
+                                                update_state.set(UpdateState::ReadyToRestart),
+                                            Ok(Err(e)) =>
+                                                update_state.set(UpdateState::Error(e.to_string())),
+                                            Err(_) =>
+                                                update_state.set(UpdateState::Error(
+                                                    "Download task panicked".into()
+                                                )),
+                                        }
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
-            }}
+            }
 
+            // ── Toolbar (Tree screen only) ─────────────────────────────────
             match screen.read().clone() {
                 Screen::Tree => rsx! {
                     Toolbar {
-                        repo_name:   repo_tree.read().as_ref()
-                                         .map(|r| r.repo_name.clone())
-                                         .unwrap_or_default(),
+                        repo_name:    repo_tree.read().as_ref()
+                                          .map(|r| r.repo_name.clone())
+                                          .unwrap_or_default(),
                         search_query: search_query.read().clone(),
-                        on_search:   move |q: String| search_query.set(q),
-                        on_home:     move |_| {
+                        on_search:    move |q: String| search_query.set(q),
+                        on_home:      move |_| {
                             search_query.set(String::new());
                             screen.set(Screen::Home);
                         },
-                        on_settings: move |_| screen.set(Screen::Settings),
-                        on_refresh:  move |_| {},
-                        on_stats: move |_| screen.set(Screen::Stats),
-                        on_export: handle_export,
+                        on_settings:  move |_| screen.set(Screen::Settings),
+                        on_refresh:   move |_| {},
+                        on_stats:     move |_| screen.set(Screen::Stats),
+                        on_export:    handle_export,
                     }
                 },
                 _ => rsx! {}
             }
 
+            // ── Main screen router ─────────────────────────────────────────
             match screen.read().clone() {
 
                 Screen::Home => rsx! {
@@ -263,9 +285,9 @@ pub fn App() -> Element {
                                 style: "grid-template-columns: {lw} 1fr {rw};",
 
                                 LeftPanel {
-                                    commit:    selected_commit.read().clone(),
-                                    open:      *left_open.read(),
-                                    on_toggle: move |_| left_open.set(!left_open()),
+                                    commit:     selected_commit.read().clone(),
+                                    open:       *left_open.read(),
+                                    on_toggle:  move |_| left_open.set(!left_open()),
                                     remote_url: repo_tree.read().as_ref()
                                         .and_then(|r| r.remote_url.clone()),
                                 }
@@ -273,20 +295,20 @@ pub fn App() -> Element {
                                 TreeCanvas {
                                     tree:          repo_tree.read().clone(),
                                     selected_hash: selected_commit.read()
-                                                       .as_ref().map(|c| c.hash.clone()),
+                                                       .as_ref()
+                                                       .map(|c| c.hash.clone()),
                                     search_query:  search_query.read().clone(),
                                     node_spacing:  *node_spacing.read(),
                                     show_merges:   *show_merges.read(),
                                     direction:     tree_direction.read().clone(),
                                     branch_style:  branch_style.read().clone(),
-                                    on_select:     move |commit: CommitNode| {
+                                    on_select: move |commit: CommitNode| {
                                         let hash = commit.hash.clone();
-                                        // Show commit metadata immediately
                                         selected_commit.set(Some(commit.clone()));
 
-                                        // Return early if diff already cached
                                         if diff_cache.read().contains_key(&hash) {
-                                            let (files, stats) = diff_cache.read()[&hash].clone();
+                                            let (files, stats) =
+                                                diff_cache.read()[&hash].clone();
                                             let mut c = commit.clone();
                                             c.files_changed = files;
                                             c.stats = stats;
@@ -294,42 +316,45 @@ pub fn App() -> Element {
                                             return;
                                         }
 
-                                        // Lazy load diff in background
                                         diff_loading.set(true);
                                         let repo_path = repo_tree.read().as_ref()
                                             .and_then(|r| r.repo_path.clone());
 
                                         spawn(async move {
                                             if let Some(path) = repo_path {
-                                                let (tx, rx) = tokio::sync::oneshot::channel();
+                                                let (tx, rx) =
+                                                    tokio::sync::oneshot::channel();
                                                 let h = hash.clone();
                                                 std::thread::spawn(move || {
-                                                    let _ = tx.send(load_commit_diff(&path, &h));
+                                                    let _ = tx.send(
+                                                        load_commit_diff(&path, &h)
+                                                    );
                                                 });
-
                                                 if let Ok(Ok((files, stats))) = rx.await {
                                                     diff_cache.write().insert(
                                                         hash.clone(),
-                                                        (files.clone(), stats.clone())
+                                                        (files.clone(), stats.clone()),
                                                     );
-                                                    let still_selected = selected_commit.read()
-                                                        .as_ref()
-                                                        .map(|c| c.hash == hash).unwrap_or(false);
-
+                                                    let still_selected =
+                                                        selected_commit.read()
+                                                            .as_ref()
+                                                            .map(|c| c.hash == hash)
+                                                            .unwrap_or(false);
                                                     if still_selected {
                                                         let maybe_c = selected_commit.read().clone();
-                                                        if let Some(mut c) = maybe_c {
+                                                        if let Some(mut c) = maybe_c
+                                                        {
                                                             c.files_changed = files;
                                                             c.stats = stats;
                                                             selected_commit.set(Some(c));
                                                         }
                                                     }
                                                 }
-                                            diff_loading.set(false);
+                                                diff_loading.set(false);
                                             }
                                         });
                                     },
-                                    on_deselect:   move |_| selected_commit.set(None),
+                                    on_deselect: move |_| selected_commit.set(None),
                                 }
 
                                 RightPanel {
@@ -355,6 +380,7 @@ pub fn App() -> Element {
                         crt_overlay:    *crt_overlay.read(),
                         tree_direction: tree_direction.read().clone(),
                         branch_style:   branch_style.read().clone(),
+                        app_style:      app_style.read().clone(),
                         on_theme_change: move |name: String| {
                             theme_name.set(name);
                             save_settings(&current_settings());
@@ -383,6 +409,10 @@ pub fn App() -> Element {
                             branch_style.set(s);
                             save_settings(&current_settings());
                         },
+                        on_app_style_change: move |ms: AppStyle| {
+                            app_style.set(ms);
+                            save_settings(&current_settings());
+                        },
                         on_back: move |_| screen.set(Screen::Tree),
                     }
                 },
@@ -400,7 +430,7 @@ pub fn App() -> Element {
                         rsx! {
                             if let Some(ref tree) = maybe_tree {
                                 StatsScreen {
-                                    tree: tree.clone(),
+                                    tree:    tree.clone(),
                                     on_back: move |_| screen.set(Screen::Tree),
                                 }
                             }
@@ -408,9 +438,31 @@ pub fn App() -> Element {
                     }
                 },
             }
+
+            // ── Onboarding overlay — rendered on top of everything ─────────
+            if !*onboarding_done.read() {
+                OnboardingScreen {
+                    // Live-preview: user picks Modern → class is applied NOW
+                    on_style_preview: move |s: AppStyle| {
+                        app_style.set(s);
+                        // Don't save yet — they haven't confirmed
+                    },
+                    // Done: persist style + mark onboarding complete
+                    on_complete: move |s: AppStyle| {
+                        app_style.set(s.clone());
+                        onboarding_done.set(true);
+                        let mut settings = current_settings();
+                        settings.app_style      = s;
+                        settings.onboarding_done = true;
+                        save_settings(&settings);
+                    },
+                }
+            }
         }
     }
 }
+
+// ── Update banner ─────────────────────────────────────────────────────────────
 
 #[component]
 fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
@@ -420,7 +472,8 @@ fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
                 span { class: "update-banner__text",
                     "▲ {info.latest_version} available"
                     if !info.release_notes.is_empty() {
-                        span { class: "update-banner__notes", " — {info.release_notes}" }
+                        span { class: "update-banner__notes",
+                            " — {info.release_notes}" }
                     }
                 }
                 button {
@@ -432,7 +485,8 @@ fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
         },
         UpdateState::Downloading(pct) => rsx! {
             div { class: "update-banner update-banner--downloading",
-                span { class: "update-banner__text", "⬇ Downloading update... {pct}%" }
+                span { class: "update-banner__text",
+                    "⬇ Downloading update... {pct}%" }
                 div { class: "update-banner__bar-wrap",
                     div {
                         class: "update-banner__bar-fill",
@@ -444,16 +498,15 @@ fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
         UpdateState::ReadyToRestart => rsx! {
             div { class: "update-banner update-banner--ready",
                 span { class: "update-banner__text",
-                    "✓ Update downloaded — restart git-tree to apply"
-                }
+                    "✓ Update downloaded — restart git-tree to apply" }
             }
         },
         UpdateState::Error(msg) => rsx! {
             div { class: "update-banner update-banner--error",
-                span { class: "update-banner__text", "✗ Update failed: {msg}" }
+                span { class: "update-banner__text",
+                    "✗ Update failed: {msg}" }
             }
         },
-        // Checking / Idle — render nothing
         _ => rsx! {},
     }
 }

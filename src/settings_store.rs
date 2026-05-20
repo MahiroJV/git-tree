@@ -3,6 +3,32 @@ use crate::components::tree_canvas::{BranchStyle, TreeDirection};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+// ── App Style ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AppStyle {
+    Terminal,
+    Modern,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for AppStyle {
+    fn default() -> Self {
+        AppStyle::Terminal
+    }
+}
+
+impl AppStyle {
+    pub fn css_class(&self) -> &'static str {
+        match self {
+            AppStyle::Terminal => "style-terminal",
+            AppStyle::Modern => "style-modern",
+        }
+    }
+}
+
+// ── Full settings ─────────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub theme_name: String,
@@ -12,6 +38,11 @@ pub struct AppSettings {
     pub crt_overlay: bool,
     pub tree_direction: TreeDirection,
     pub branch_style: BranchStyle,
+    #[serde(default)]
+    pub app_style: AppStyle,
+    /// false = show onboarding on next launch, true = skip straight to app
+    #[serde(default)]
+    pub onboarding_done: bool,
 }
 
 impl Default for AppSettings {
@@ -24,6 +55,8 @@ impl Default for AppSettings {
             crt_overlay: false,
             tree_direction: TreeDirection::Horizontal,
             branch_style: BranchStyle::Curved,
+            app_style: AppStyle::Terminal,
+            onboarding_done: false,
         }
     }
 }
@@ -43,9 +76,7 @@ pub fn load_settings() -> AppSettings {
 }
 
 pub fn save_settings(settings: &AppSettings) {
-    let Some(path) = config_path() else {
-        return;
-    };
+    let Some(path) = config_path() else { return };
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
