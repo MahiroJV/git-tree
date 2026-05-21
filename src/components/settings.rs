@@ -36,10 +36,36 @@ pub fn Settings(
                 }
                 h2 { class: "settings-title", "// SETTINGS" }
             }
-
             div { class: "settings-body",
                 div { class: "settings-section",
                     h3 { class: "section-title", "UI STYLE" }
+                    div { class: "setting-row",
+                        div { class: "setting-label",
+                            span { class: "setting-label-title", "STYLE" }
+                            span { class: "setting-label-value",
+                                match app_style {
+                                    AppStyle::Terminal => "Terminal",
+                                    AppStyle::Modern   => "Modern",
+                                }
+                            }
+                        }
+                        div { class: "setting-options",
+                            button {
+                                class: if app_style == AppStyle::Terminal {
+                                    "option-btn option-btn--active"
+                                } else { "option-btn" },
+                                onclick: move |_| on_app_style_change.call(AppStyle::Terminal),
+                                "[ TERMINAL ]"
+                            }
+                            button {
+                                class: if app_style == AppStyle::Modern {
+                                    "option-btn option-btn--active"
+                                } else { "option-btn" },
+                                onclick: move |_| on_app_style_change.call(AppStyle::Modern),
+                                "[ MODERN ]"
+                            }
+                        }
+                    }
 
                     div { class: "style-picker",
 
@@ -234,7 +260,6 @@ pub fn Settings(
                         }
                     }
                 }
-
                 // ── Theme ─────────────────────────────────────────────────
                 div { class: "settings-section",
                     h3 { class: "section-title", "THEME" }
