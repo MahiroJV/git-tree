@@ -495,6 +495,10 @@
     text-transform: none;
 }
 
+.style-modern .update-banner__close {
+    font-size: 13px;
+}
+
 /* ── Loading screen ──────────────────────────────────────────────────────── */
 
 .style-modern .loading-cursor {

@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const GITHUB_OWNER: &str = "MahiroJV";
 const GITHUB_REPO: &str = "git-tree";
 
@@ -24,13 +24,7 @@ const GITHUB_REPO: &str = "git-tree";
 struct GithubRelease {
     tag_name: String,
     body: Option<String>,
-    assets: Vec<GithubAsset>,
-}
-
-#[derive(Deserialize)]
-struct GithubAsset {
-    name: String,
-    browser_download_url: String,
+    html_url: String,
 }
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -38,7 +32,7 @@ struct GithubAsset {
 #[derive(Clone, PartialEq, Debug)]
 pub struct UpdateInfo {
     pub latest_version: String,
-    pub download_url: String,
+    pub release_url: String,
     pub release_notes: String,
 }
 
@@ -78,19 +72,6 @@ pub async fn check_for_updates() -> Result<Option<UpdateInfo>> {
         return Ok(None);
     }
 
-    let asset_name = platform_asset_name();
-    let asset = release
-        .assets
-        .iter()
-        .find(|a| a.name == asset_name)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Release {} has no asset named '{}'",
-                release.tag_name,
-                asset_name
-            )
-        })?;
-
     let notes = release
         .body
         .unwrap_or_default()
@@ -102,101 +83,13 @@ pub async fn check_for_updates() -> Result<Option<UpdateInfo>> {
 
     Ok(Some(UpdateInfo {
         latest_version: release.tag_name,
-        download_url: asset.browser_download_url.clone(),
+        release_url: release.html_url,
         release_notes: notes,
     }))
 }
 
-// ── Download & apply ──────────────────────────────────────────────────────────
-
-pub async fn download_and_apply(
-    download_url: &str,
-    progress: Option<tokio::sync::watch::Sender<u8>>,
-) -> Result<()> {
-    let client = reqwest::Client::builder()
-        .user_agent(format!("git-tree/{} updater", CURRENT_VERSION))
-        .timeout(std::time::Duration::from_secs(180))
-        .build()
-        .context("Failed to build HTTP client")?;
-
-    let resp = client
-        .get(download_url)
-        .send()
-        .await
-        .context("Download request failed")?;
-
-    let total = resp.content_length().unwrap_or(0);
-    let mut downloaded: u64 = 0;
-    let mut bytes = Vec::with_capacity(total as usize);
-
-    use futures_util::StreamExt;
-    let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.context("Error reading download chunk")?;
-        downloaded += chunk.len() as u64;
-        bytes.extend_from_slice(&chunk);
-
-        #[allow(clippy::manual_checked_ops)]
-        if total > 0 {
-            let pct = ((downloaded * 100) / total) as u8;
-            if let Some(tx) = &progress {
-                let _ = tx.send(pct);
-            }
-        }
-    }
-
-    let current_exe = std::env::current_exe().context("Cannot locate current executable")?;
-    let tmp_path = current_exe.with_extension("update.tmp");
-
-    std::fs::write(&tmp_path, &bytes).context("Failed to write downloaded binary")?;
-
-    apply_update(&current_exe, &tmp_path)?;
-    Ok(())
-}
-
-// ── Platform apply ────────────────────────────────────────────────────────────
-
-#[cfg(unix)]
-fn apply_update(current_exe: &std::path::Path, tmp_path: &std::path::Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(tmp_path, std::fs::Permissions::from_mode(0o755))
-        .context("Failed to chmod downloaded binary")?;
-    std::fs::rename(tmp_path, current_exe).context("Failed to replace current binary")?;
-    Ok(())
-}
-
-#[cfg(windows)]
-fn apply_update(current_exe: &std::path::Path, tmp_path: &std::path::Path) -> Result<()> {
-    let bat_path = current_exe.with_extension("update.bat");
-    let bat = format!(
-        "@echo off\r\n\
-         :wait\r\n\
-         timeout /t 1 /nobreak > nul\r\n\
-         move /y \"{tmp}\" \"{exe}\" > nul 2>&1\r\n\
-         if errorlevel 1 goto wait\r\n\
-         start \"\" \"{exe}\"\r\n\
-         del \"%~f0\"",
-        tmp = tmp_path.display(),
-        exe = current_exe.display(),
-    );
-    std::fs::write(&bat_path, bat).context("Failed to write update helper script")?;
-    std::process::Command::new("cmd")
-        .args(["/c", "start", "/min", "", bat_path.to_str().unwrap_or("")])
-        .spawn()
-        .context("Failed to launch update helper script")?;
-    std::process::exit(0);
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn platform_asset_name() -> &'static str {
-    #[cfg(target_os = "windows")]
-    return "git-tree-windows-x86_64.exe";
-    #[cfg(target_os = "linux")]
-    return "git-tree-linux-x86_64";
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    return "git-tree-linux-x86_64";
-}
 
 fn is_newer(candidate: &str, current: &str) -> bool {
     fn parse(s: &str) -> (u32, u32, u32) {

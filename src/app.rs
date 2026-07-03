@@ -15,7 +15,7 @@ use crate::git::parser::CommitNode;
 use crate::git::parser::RepoTree;
 use crate::settings_store::{load_settings, save_settings, AppSettings, AppStyle};
 use crate::theme::theme_by_name;
-use crate::updater::{check_for_updates, download_and_apply, UpdateInfo};
+use crate::updater::{check_for_updates, UpdateInfo};
 use dioxus::prelude::*;
 
 const BASE_CSS: &str = include_str!("../assets/css/style.css");
@@ -37,12 +37,15 @@ pub enum Screen {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum UpdateState {
-    Checking,
+    /// No check has run yet this session — the default, since we no longer
+    /// auto-check on startup. User triggers a check from Settings.
     Idle,
+    Checking,
     Available(UpdateInfo),
-    Downloading(u8),
-    ReadyToRestart,
+    UpToDate,
     Error(String),
+    /// User closed the result notification — stay quiet until they check again.
+    Dismissed,
 }
 
 // ── Root component ────────────────────────────────────────────────────────────
@@ -88,16 +91,20 @@ pub fn App() -> Element {
     let mut right_open = use_signal(|| true);
 
     // ── Update state ───────────────────────────────────────────────────────
-    let mut update_state: Signal<UpdateState> = use_signal(|| UpdateState::Checking);
+    // No auto-check on startup anymore — purely opt-in via the "Check for
+    // Updates" button in Settings (see on_check_updates below).
+    let mut update_state: Signal<UpdateState> = use_signal(|| UpdateState::Idle);
 
-    use_effect(move || {
+    let on_check_updates = move |_| {
+        update_state.set(UpdateState::Checking);
         spawn(async move {
             match check_for_updates().await {
                 Ok(Some(info)) => update_state.set(UpdateState::Available(info)),
-                _ => update_state.set(UpdateState::Idle),
+                Ok(None) => update_state.set(UpdateState::UpToDate),
+                Err(e) => update_state.set(UpdateState::Error(e.to_string())),
             }
         });
-    });
+    };
 
     let zoom = use_memo(move || *font_size.read() as f64 / 13.0);
 
@@ -188,37 +195,10 @@ pub fn App() -> Element {
                 on_update: move |_| {
                     let state = update_state.read().clone();
                     if let UpdateState::Available(info) = state {
-                        let url = info.download_url.clone();
-                        update_state.set(UpdateState::Downloading(0));
-                        spawn(async move {
-                            let (tx, mut rx) = tokio::sync::watch::channel(0u8);
-                            let url2 = url.clone();
-                            let mut dl = tokio::spawn(async move {
-                                download_and_apply(&url2, Some(tx)).await
-                            });
-                            loop {
-                                tokio::select! {
-                                    _ = rx.changed() => {
-                                        update_state.set(UpdateState::Downloading(*rx.borrow()));
-                                    }
-                                    result = &mut dl => {
-                                        match result {
-                                            Ok(Ok(())) =>
-                                                update_state.set(UpdateState::ReadyToRestart),
-                                            Ok(Err(e)) =>
-                                                update_state.set(UpdateState::Error(e.to_string())),
-                                            Err(_) =>
-                                                update_state.set(UpdateState::Error(
-                                                    "Download task panicked".into()
-                                                )),
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        });
+                        let _ = webbrowser::open(&info.release_url);
                     }
-                }
+                },
+                on_dismiss: move |_| update_state.set(UpdateState::Dismissed),
             }
 
             // ── Toolbar (Tree screen only) ─────────────────────────────────
@@ -381,6 +361,9 @@ pub fn App() -> Element {
                         tree_direction: tree_direction.read().clone(),
                         branch_style:   branch_style.read().clone(),
                         app_style:      app_style.read().clone(),
+                        current_version: crate::updater::CURRENT_VERSION,
+                        checking_for_updates: matches!(*update_state.read(), UpdateState::Checking),
+                        on_check_updates: on_check_updates,
                         on_theme_change: move |name: String| {
                             theme_name.set(name);
                             save_settings(&current_settings());
@@ -465,8 +448,41 @@ pub fn App() -> Element {
 // ── Update banner ─────────────────────────────────────────────────────────────
 
 #[component]
-fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
+fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>, on_dismiss: EventHandler<()>) -> Element {
     match state {
+        UpdateState::Checking => rsx! {
+            div { class: "update-banner update-banner--checking",
+                span { class: "update-banner__text", "… checking for updates" }
+                button {
+                    class: "update-banner__close",
+                    "aria-label": "Dismiss",
+                    onclick: move |_| on_dismiss.call(()),
+                    "✕"
+                }
+            }
+        },
+        UpdateState::UpToDate => rsx! {
+            div { class: "update-banner update-banner--uptodate",
+                span { class: "update-banner__text", "✓ you're on the latest version" }
+                button {
+                    class: "update-banner__close",
+                    "aria-label": "Dismiss",
+                    onclick: move |_| on_dismiss.call(()),
+                    "✕"
+                }
+            }
+        },
+        UpdateState::Error(msg) => rsx! {
+            div { class: "update-banner update-banner--error",
+                span { class: "update-banner__text", "✗ update check failed: {msg}" }
+                button {
+                    class: "update-banner__close",
+                    "aria-label": "Dismiss",
+                    onclick: move |_| on_dismiss.call(()),
+                    "✕"
+                }
+            }
+        },
         UpdateState::Available(info) => rsx! {
             div { class: "update-banner update-banner--available",
                 span { class: "update-banner__text",
@@ -479,32 +495,14 @@ fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>) -> Element {
                 button {
                     class: "update-banner__btn",
                     onclick: move |_| on_update.call(()),
-                    "[ UPDATE NOW ]"
+                    "[ VIEW RELEASE ]"
                 }
-            }
-        },
-        UpdateState::Downloading(pct) => rsx! {
-            div { class: "update-banner update-banner--downloading",
-                span { class: "update-banner__text",
-                    "⬇ Downloading update... {pct}%" }
-                div { class: "update-banner__bar-wrap",
-                    div {
-                        class: "update-banner__bar-fill",
-                        style: "width: {pct}%",
-                    }
+                button {
+                    class: "update-banner__close",
+                    "aria-label": "Dismiss update notice",
+                    onclick: move |_| on_dismiss.call(()),
+                    "✕"
                 }
-            }
-        },
-        UpdateState::ReadyToRestart => rsx! {
-            div { class: "update-banner update-banner--ready",
-                span { class: "update-banner__text",
-                    "✓ Update downloaded — restart git-tree to apply" }
-            }
-        },
-        UpdateState::Error(msg) => rsx! {
-            div { class: "update-banner update-banner--error",
-                span { class: "update-banner__text",
-                    "✗ Update failed: {msg}" }
             }
         },
         _ => rsx! {},

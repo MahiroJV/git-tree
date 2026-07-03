@@ -22,6 +22,9 @@ pub fn Settings(
     branch_style: BranchStyle,
     on_branch_style_change: EventHandler<BranchStyle>,
     on_app_style_change: EventHandler<AppStyle>,
+    current_version: &'static str,
+    checking_for_updates: bool,
+    on_check_updates: EventHandler<()>,
 ) -> Element {
     rsx! {
         div {
@@ -512,6 +515,29 @@ pub fn Settings(
                                         stroke:"currentColor", stroke_width:"1.5", fill:"none"
                                     }
                                     circle { cx:"28", cy:"8", r:"3.5", fill:"currentColor" }
+                                }
+                            }
+                        }
+                    }
+                }
+                // About
+                div { class: "setting-section",
+                    h3 { class: "section-title", "ABOUT" }
+
+                    div { class: "setting-row",
+                        div { class: "setting-label",
+                            span { class: "setting=label-title", "VERSION" }
+                            span { class: "setting-label-value", "{current_version}" }
+                        }
+                        div { class: "setting-options",
+                            button {
+                                class: "option-btn",
+                                disabled: checking_for_updates,
+                                onclick: move |_| on_check_updates.call(()),
+                                if checking_for_updates {
+                                    "[ CHECKING... ]"
+                                } else {
+                                    
                                 }
                             }
                         }
