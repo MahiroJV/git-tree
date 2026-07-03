@@ -90,7 +90,6 @@ pub async fn check_for_updates() -> Result<Option<UpdateInfo>> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-
 fn is_newer(candidate: &str, current: &str) -> bool {
     fn parse(s: &str) -> (u32, u32, u32) {
         #[allow(clippy::manual_pattern_char_comparison)]

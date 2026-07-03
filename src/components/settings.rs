@@ -537,7 +537,7 @@ pub fn Settings(
                                 if checking_for_updates {
                                     "[ CHECKING... ]"
                                 } else {
-                                    
+
                                 }
                             }
                         }

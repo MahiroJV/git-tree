@@ -448,7 +448,11 @@ pub fn App() -> Element {
 // ── Update banner ─────────────────────────────────────────────────────────────
 
 #[component]
-fn UpdateBanner(state: UpdateState, on_update: EventHandler<()>, on_dismiss: EventHandler<()>) -> Element {
+fn UpdateBanner(
+    state: UpdateState,
+    on_update: EventHandler<()>,
+    on_dismiss: EventHandler<()>,
+) -> Element {
     match state {
         UpdateState::Checking => rsx! {
             div { class: "update-banner update-banner--checking",
