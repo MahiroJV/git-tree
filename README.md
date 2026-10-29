@@ -181,6 +181,13 @@ dx build --platform desktop --release
 - Toolbar → `[ VIEW DIFF ]` to open the full diff viewer
 - Toolbar → `[ STATS ]` to open the repo stats screen
 
+**Keyboard shortcuts:** (press `?` any time to see this list in-app)
+- `← → / ↑ ↓` or `h l / j k` — navigate commits
+- `+ / -` zoom, `0` reset zoom & pan
+- `[` / `]` — toggle left / right panel
+- `/` — focus search · `d` — view diff · `s` — stats · `,` — settings · `e` — export SVG
+- `ESC` — back / deselect · `?` — toggle shortcuts help
+
 **Settings:**
 - 15 themes with live preview
 - Font size, node spacing, merge commit visibility
@@ -262,7 +269,7 @@ dx build --platform desktop --release
 ---
 
 ### 🏁 v1.0 — Release
-- [ ] Full keyboard shortcut system
+- [x] Full keyboard shortcut system
 - [ ] Performance improvements for very large repos
 - [ ] Community themes
 

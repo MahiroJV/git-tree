@@ -5,6 +5,7 @@ use crate::components::{
     onboarding::OnboardingScreen,
     right_panel::RightPanel,
     settings::Settings,
+    shortcuts::ShortcutsHelp,
     stats::StatsScreen,
     toolbar::Toolbar,
     tree_canvas::{BranchStyle, TreeCanvas, TreeDirection},
@@ -143,7 +144,7 @@ pub fn App() -> Element {
     });
 
     // ── SVG export ─────────────────────────────────────────────────────────
-    let handle_export = move |_| {
+    let do_export = move || {
         let maybe_tree = repo_tree.read().clone();
         let spacing_s = *node_spacing.read();
         let merges = *show_merges.read();
@@ -165,6 +166,59 @@ pub fn App() -> Element {
             });
         }
     };
+    let handle_export = move |_| do_export();
+
+    // ── Keyboard shortcuts ───────────────────────────────────────────────
+    let mut show_shortcuts = use_signal(|| false);
+
+    let global_keydown = move |e: KeyboardEvent| {
+        // The only text input outside Screen::Home stops propagation itself
+        // (toolbar search), so anything reaching here is a real shortcut.
+        if matches!(*screen.read(), Screen::Home | Screen::Loading(_)) {
+            return;
+        }
+
+        let is_char = |c: &str| matches!(&e.key(), Key::Character(s) if s.eq_ignore_ascii_case(c));
+        let plain = !e.modifiers().ctrl() && !e.modifiers().meta() && !e.modifiers().alt();
+
+        if plain && is_char("?") {
+            show_shortcuts.set(!show_shortcuts());
+            return;
+        }
+
+        if e.key() == Key::Escape {
+            if *show_shortcuts.read() {
+                show_shortcuts.set(false);
+            } else if matches!(*screen.read(), Screen::Settings | Screen::Stats | Screen::Diff(_)) {
+                screen.set(Screen::Tree);
+            }
+            return;
+        }
+
+        if *show_shortcuts.read() || !plain || !matches!(*screen.read(), Screen::Tree) {
+            return;
+        }
+
+        if is_char("/") {
+            let _ = dioxus::document::eval(
+                "document.getElementById('toolbar-search-input')?.focus()",
+            );
+        } else if is_char("s") {
+            screen.set(Screen::Stats);
+        } else if is_char(",") {
+            screen.set(Screen::Settings);
+        } else if is_char("e") {
+            do_export();
+        } else if is_char("d") {
+            if let Some(c) = selected_commit.read().clone() {
+                screen.set(Screen::Diff(Box::new(c)));
+            }
+        } else if is_char("[") {
+            left_open.set(!left_open());
+        } else if is_char("]") {
+            right_open.set(!right_open());
+        }
+    };
 
     // ── Root CSS class — drives Terminal vs Modern overrides ───────────────
     let root_style_class = use_memo(move || app_style.read().css_class());
@@ -177,13 +231,17 @@ pub fn App() -> Element {
 
         div {
             class: format!("app-root {}", root_style_class.read()),
+            tabindex: "0",
+            autofocus: true,
             style: "
                 width: calc(100vw / var(--zoom));
                 height: calc(100vh / var(--zoom));
                 transform: scale(var(--zoom));
                 transform-origin: top left;
                 position: relative;
+                outline: none;
             ",
+            onkeydown: global_keydown,
 
             if *crt_overlay.read() {
                 div { class: "crt-overlay", aria_hidden: "true" }
@@ -218,6 +276,7 @@ pub fn App() -> Element {
                         on_refresh:   move |_| {},
                         on_stats:     move |_| screen.set(Screen::Stats),
                         on_export:    handle_export,
+                        on_shortcuts: move |_| show_shortcuts.set(true),
                     }
                 },
                 _ => rsx! {}
@@ -439,6 +498,13 @@ pub fn App() -> Element {
                         settings.onboarding_done = true;
                         save_settings(&settings);
                     },
+                }
+            }
+
+            // ── Keyboard shortcuts overlay ──────────────────────────────────
+            if *show_shortcuts.read() {
+                ShortcutsHelp {
+                    on_close: move |_| show_shortcuts.set(false),
                 }
             }
         }

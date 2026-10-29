@@ -230,7 +230,12 @@ pub fn TreeCanvas(
             } else {
                 (Key::ArrowRight, Key::ArrowLeft)
             };
-            if e.key() == fwd {
+            // vim-style aliases — j/k move like down/up, h/l like left/right,
+            // mapped onto whichever axis the tree is currently laid out on.
+            let (fwd_alias, back_alias) = if vert { ("j", "k") } else { ("l", "h") };
+            let is_char = |c: &str| matches!(&e.key(), Key::Character(s) if s == c);
+
+            if e.key() == fwd || is_char(fwd_alias) {
                 let next = match &selected {
                     None => commits.first().cloned(),
                     Some(h) => commits
@@ -242,7 +247,7 @@ pub fn TreeCanvas(
                 if let Some(c) = next {
                     on_select.call(c);
                 }
-            } else if e.key() == back {
+            } else if e.key() == back || is_char(back_alias) {
                 let prev = match &selected {
                     None => commits.last().cloned(),
                     Some(h) => commits
@@ -256,19 +261,29 @@ pub fn TreeCanvas(
                 }
             } else if e.key() == Key::Escape {
                 on_deselect.call(());
+            } else if is_char("+") || is_char("=") {
+                let s = (*scale.read() + 0.1).min(3.0);
+                scale.set(s);
+            } else if is_char("-") || is_char("_") {
+                let s = (*scale.read() - 0.1).max(0.2);
+                scale.set(s);
+            } else if is_char("0") {
+                scale.set(1.0);
+                offset_x.set(0.0);
+                offset_y.set(0.0);
             }
         }
     };
 
     let hint = match match_count {
         Some(n) => format!(
-            "{n} match{}  ·  {} navigate  ·  ESC deselect",
+            "{n} match{}  ·  {} navigate  ·  ESC deselect  ·  ? for shortcuts",
             if n == 1 { "" } else { "es" },
-            if is_vertical { "↑ ↓" } else { "← →" }
+            if is_vertical { "↑↓ / j k" } else { "← → / h l" }
         ),
         None => format!(
-            "{} navigate  ·  ESC deselect  ·  CTRL+scroll zoom  ·  drag pan",
-            if is_vertical { "↑ ↓" } else { "← →" }
+            "{} navigate  ·  ESC deselect  ·  +/- zoom  ·  0 reset  ·  ? for shortcuts",
+            if is_vertical { "↑↓ / j k" } else { "← → / h l" }
         ),
     };
 

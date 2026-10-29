@@ -4,6 +4,7 @@ pub mod left_panel;
 pub mod onboarding;
 pub mod right_panel;
 pub mod settings;
+pub mod shortcuts;
 pub mod stats;
 pub mod toolbar;
 pub mod tree_canvas;

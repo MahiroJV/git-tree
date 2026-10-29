@@ -11,6 +11,7 @@ pub fn Toolbar(
     on_refresh: EventHandler<()>,
     on_stats: EventHandler<()>,
     on_export: EventHandler<()>,
+    on_shortcuts: EventHandler<()>,
 ) -> Element {
     rsx! {
         nav {
@@ -30,6 +31,7 @@ pub fn Toolbar(
                 div { class: "toolbar-search-wrap",
                     span { class: "toolbar-search-prompt", ">" }
                     input {
+                        id: "toolbar-search-input",
                         class: "toolbar-search-input",
                         r#type: "text",
                         placeholder: if repo_name.is_empty() {
@@ -39,6 +41,9 @@ pub fn Toolbar(
                         },
                         value: "{search_query}",
                         oninput: move |e| on_search.call(e.value()),
+                        // keeps global shortcut keys (s, e, d, [, ]…) from
+                        // firing while the user is typing a search query
+                        onkeydown: move |e: KeyboardEvent| e.stop_propagation(),
                     }
                     // live match indicator — only visible when typing
                     if !search_query.is_empty() {
@@ -73,6 +78,12 @@ pub fn Toolbar(
                     class: "toolbar-btn toolbar-btn-accent",
                     onclick: move |_| on_settings.call(()),
                     "[ SETTINGS ]"
+                }
+                button {
+                    class: "toolbar-btn",
+                    title: "Keyboard shortcuts (?)",
+                    onclick: move |_| on_shortcuts.call(()),
+                    "[ ? ]"
                 }
             }
         }
