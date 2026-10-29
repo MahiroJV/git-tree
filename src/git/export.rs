@@ -236,7 +236,7 @@ pub fn generate_svg(
   <path d="{}" stroke="{color}" stroke-width="1.5" fill="none"/>
   <path d="{}" stroke="{color}" stroke-width="1.5" fill="none"/>
 "##,
-                &commit.short_hash, d_in, d_out
+                commit.short_hash, d_in, d_out
             ));
         }
     }

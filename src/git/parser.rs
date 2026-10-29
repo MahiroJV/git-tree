@@ -335,7 +335,7 @@ fn build_branch_lines(commits: &[CommitNode]) -> Vec<BranchLine> {
         direction_toggle = !direction_toggle;
 
         lines.push(BranchLine {
-            name: format!("branch-{}", &commit.short_hash),
+            name: format!("branch-{}", commit.short_hash),
             commits: vec![commit.hash.clone()],
             color: commit.color.clone(),
             direction: dir,
