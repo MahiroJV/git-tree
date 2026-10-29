@@ -279,11 +279,19 @@ pub fn TreeCanvas(
         Some(n) => format!(
             "{n} match{}  ·  {} navigate  ·  ESC deselect  ·  ? for shortcuts",
             if n == 1 { "" } else { "es" },
-            if is_vertical { "↑↓ / j k" } else { "← → / h l" }
+            if is_vertical {
+                "↑↓ / j k"
+            } else {
+                "← → / h l"
+            }
         ),
         None => format!(
             "{} navigate  ·  ESC deselect  ·  +/- zoom  ·  0 reset  ·  ? for shortcuts",
-            if is_vertical { "↑↓ / j k" } else { "← → / h l" }
+            if is_vertical {
+                "↑↓ / j k"
+            } else {
+                "← → / h l"
+            }
         ),
     };
 

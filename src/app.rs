@@ -189,7 +189,10 @@ pub fn App() -> Element {
         if e.key() == Key::Escape {
             if *show_shortcuts.read() {
                 show_shortcuts.set(false);
-            } else if matches!(*screen.read(), Screen::Settings | Screen::Stats | Screen::Diff(_)) {
+            } else if matches!(
+                *screen.read(),
+                Screen::Settings | Screen::Stats | Screen::Diff(_)
+            ) {
                 screen.set(Screen::Tree);
             }
             return;
@@ -200,9 +203,8 @@ pub fn App() -> Element {
         }
 
         if is_char("/") {
-            let _ = dioxus::document::eval(
-                "document.getElementById('toolbar-search-input')?.focus()",
-            );
+            let _ =
+                dioxus::document::eval("document.getElementById('toolbar-search-input')?.focus()");
         } else if is_char("s") {
             screen.set(Screen::Stats);
         } else if is_char(",") {
