@@ -1,0 +1,30 @@
+name: Build - macOS
+
+on:
+  workflow_call:
+    outputs:
+      artifact-name:
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+env:
+  BINARY_NAME: git-tree
+
+jobs:
+  build:
+    runs-on: macos-latest
+    outputs:
+      artifact-name: ${{ steps.meta.outputs.artifact-name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: brew install libgit2 pkg-config
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release
+      - run: strip target/release/${{ env.BINARY_NAME }}
+      - id: meta
+        run: echo "artifact-name=${{ env.BINARY_NAME }}-macos-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact-name }}
+          path: target/release/${{ env.BINARY_NAME }}
+          if-no-files-found: error
