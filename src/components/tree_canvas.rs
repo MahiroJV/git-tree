@@ -46,17 +46,18 @@ pub enum BranchStyle {
 
 // ── Search helper ─────────────────────────────────────────────────────────────
 
-fn commit_matches(commit: &CommitNode, query: &str) -> bool {
-    if query.is_empty() {
+/// `query_lower` must already be lowercased — hoisted out of the per-commit
+/// loop so we don't re-lowercase the same query string once per commit.
+fn commit_matches(commit: &CommitNode, query_lower: &str) -> bool {
+    if query_lower.is_empty() {
         return true;
     }
-    let q = query.to_lowercase();
-    commit.author_name.to_lowercase().contains(&q)
-        || commit.author_email.to_lowercase().contains(&q)
-        || commit.message.to_lowercase().contains(&q)
-        || commit.full_message.to_lowercase().contains(&q)
-        || commit.short_hash.to_lowercase().contains(&q)
-        || commit.hash.to_lowercase().contains(&q)
+    commit.author_name.to_lowercase().contains(query_lower)
+        || commit.author_email.to_lowercase().contains(query_lower)
+        || commit.message.to_lowercase().contains(query_lower)
+        || commit.full_message.to_lowercase().contains(query_lower)
+        || commit.short_hash.to_lowercase().contains(query_lower)
+        || commit.hash.to_lowercase().contains(query_lower)
 }
 
 // ── Path builders — Curved ────────────────────────────────────────────────────
@@ -111,6 +112,18 @@ fn geo_v_leave(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
     format!("M {x1} {y1} L {x2} {yc} L {x2} {y2}")
 }
 
+// ── Layout (memoized) ─────────────────────────────────────────────────────────
+
+/// Everything derived from the tree + display settings, kept separate from
+/// `scale`/`offset_x`/`offset_y` so panning and zooming never touches it.
+#[derive(Clone, PartialEq)]
+struct TreeLayout {
+    positioned: Vec<(CommitNode, f64, f64, bool)>,
+    canvas_width: f64,
+    canvas_height: f64,
+    match_count: Option<usize>,
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 #[component]
@@ -140,78 +153,122 @@ pub fn TreeCanvas(
     let is_vertical = direction == TreeDirection::Vertical;
     let is_geometric = branch_style == BranchStyle::Geometric;
 
-    let visible: Vec<CommitNode> = tree
-        .commits
-        .iter()
-        .filter(|c| show_merges || !c.is_merge)
-        .cloned()
-        .collect();
+    // Layout depends only on the tree + display settings — never on
+    // scale/offset_x/offset_y, which change on every pan/zoom tick. Without
+    // this memo, every mouse-move during a drag re-cloned and repositioned
+    // every commit from scratch just to redraw the same unmoved nodes under
+    // a new CSS transform.
+    let layout = use_memo(use_reactive(
+        (
+            &tree,
+            &show_merges,
+            &direction,
+            &branch_style,
+            &node_spacing,
+            &search_query,
+        ),
+        |(tree, show_merges, direction, branch_style, node_spacing, search_query): (
+            RepoTree,
+            bool,
+            TreeDirection,
+            BranchStyle,
+            f64,
+            String,
+        )| {
+            let is_vertical = direction == TreeDirection::Vertical;
+            let is_geometric = branch_style == BranchStyle::Geometric;
+            let query_lower = search_query.to_lowercase();
 
-    let count = visible.len().max(1);
+            let visible: Vec<&CommitNode> = tree
+                .commits
+                .iter()
+                .filter(|c| show_merges || !c.is_merge)
+                .collect();
 
-    let (canvas_width, canvas_height) = if is_vertical {
-        (V_CANVAS_WIDTH, (count as f64 * node_spacing) + 200.0)
-    } else {
-        ((count as f64 * node_spacing) + 200.0, H_CANVAS_HEIGHT)
-    };
+            let count = visible.len().max(1);
 
-    let positioned: Vec<(CommitNode, f64, f64, bool)> = visible
-        .iter()
-        .enumerate()
-        .map(|(i, commit)| {
-            let (x, y) = if is_vertical {
-                let y = 100.0 + i as f64 * node_spacing;
-                let x = if commit.is_merge {
-                    let base = if i % 2 == 0 {
-                        V_H_BRANCH_LEFT
-                    } else {
-                        V_H_BRANCH_RIGHT
-                    };
-                    if is_geometric {
-                        if i % 2 == 0 {
-                            base - 15.0
-                        } else {
-                            base + 15.0
-                        }
-                    } else {
-                        base
-                    }
-                } else {
-                    V_H_MAIN
-                };
-                (x, y)
+            let (canvas_width, canvas_height) = if is_vertical {
+                (V_CANVAS_WIDTH, (count as f64 * node_spacing) + 200.0)
             } else {
-                let x = 100.0 + i as f64 * node_spacing;
-                let y = if commit.is_merge {
-                    let base = if i % 2 == 0 {
-                        H_V_BRANCH_UP
-                    } else {
-                        H_V_BRANCH_DOWN
-                    };
-                    if is_geometric {
-                        if i % 2 == 0 {
-                            base - 15.0
-                        } else {
-                            base + 15.0
-                        }
-                    } else {
-                        base
-                    }
-                } else {
-                    H_V_MAIN
-                };
-                (x, y)
+                ((count as f64 * node_spacing) + 200.0, H_CANVAS_HEIGHT)
             };
-            (commit.clone(), x, y, commit_matches(commit, &search_query))
-        })
-        .collect();
 
+            let positioned: Vec<(CommitNode, f64, f64, bool)> = visible
+                .iter()
+                .enumerate()
+                .map(|(i, commit)| {
+                    let (x, y) = if is_vertical {
+                        let y = 100.0 + i as f64 * node_spacing;
+                        let x = if commit.is_merge {
+                            let base = if i % 2 == 0 {
+                                V_H_BRANCH_LEFT
+                            } else {
+                                V_H_BRANCH_RIGHT
+                            };
+                            if is_geometric {
+                                if i % 2 == 0 {
+                                    base - 15.0
+                                } else {
+                                    base + 15.0
+                                }
+                            } else {
+                                base
+                            }
+                        } else {
+                            V_H_MAIN
+                        };
+                        (x, y)
+                    } else {
+                        let x = 100.0 + i as f64 * node_spacing;
+                        let y = if commit.is_merge {
+                            let base = if i % 2 == 0 {
+                                H_V_BRANCH_UP
+                            } else {
+                                H_V_BRANCH_DOWN
+                            };
+                            if is_geometric {
+                                if i % 2 == 0 {
+                                    base - 15.0
+                                } else {
+                                    base + 15.0
+                                }
+                            } else {
+                                base
+                            }
+                        } else {
+                            H_V_MAIN
+                        };
+                        (x, y)
+                    };
+                    (
+                        (*commit).clone(),
+                        x,
+                        y,
+                        commit_matches(commit, &query_lower),
+                    )
+                })
+                .collect();
+
+            let match_count = if query_lower.is_empty() {
+                None
+            } else {
+                Some(positioned.iter().filter(|(_, _, _, m)| *m).count())
+            };
+
+            TreeLayout {
+                positioned,
+                canvas_width,
+                canvas_height,
+                match_count,
+            }
+        },
+    ));
+
+    let canvas_width = layout.read().canvas_width;
+    let canvas_height = layout.read().canvas_height;
+    let match_count = layout.read().match_count;
+    let positioned: Vec<(CommitNode, f64, f64, bool)> = layout.read().positioned.clone();
     let mm_positioned = positioned.clone();
-    let match_count = if search_query.is_empty() {
-        None
-    } else {
-        Some(positioned.iter().filter(|(_, _, _, m)| *m).count())
-    };
 
     // ── Keyboard nav ──────────────────────────────────────────────────────────
     let commits_for_kb = positioned
@@ -623,6 +680,7 @@ pub fn TreeCanvas(
                     // ── Commit nodes ──────────────────────────────────────
                     for (commit, x, y, matches) in positioned {
                         CommitDot {
+                            key: "{commit.hash}",
                             commit:   commit.clone(),
                             x, y,
                             is_vertical,

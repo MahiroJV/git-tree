@@ -263,8 +263,7 @@ dx build --platform desktop --release
 ### 🖥️ v0.4 — Platform
 - [x] GitHub OAuth login (private repo access)
 - [x] Windows installer (MSI via cargo-wix)
-- [ ] macOS build
-- [ ] Linux Flatpak / Snap packaging
+- [x] macOS build
 
 ---
 

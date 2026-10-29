@@ -61,29 +61,10 @@ pub struct DiffStats {
     pub deletions: usize,
 }
 
-/// A branch line in the visual tree
-#[derive(Debug, Clone, PartialEq)]
-pub struct BranchLine {
-    pub name: String,
-    pub commits: Vec<String>,
-    pub color: String,
-    pub direction: BranchDirection,
-    pub parent_hash: String,
-    pub merge_hash: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BranchDirection {
-    Up,
-    Down,
-}
-
 /// The full parsed repository tree ready for rendering
 #[derive(Debug, PartialEq, Clone)]
 pub struct RepoTree {
     pub commits: Vec<CommitNode>,
-    pub branches: Vec<BranchLine>,
-    pub main_branch: Vec<String>,
     pub repo_name: String,
     pub remote_url: Option<String>,
     pub total_contributors: usize,
@@ -93,7 +74,7 @@ pub struct RepoTree {
 
 // ─── Limits ──────────────────────────────────────────────────────────────────
 
-const MAX_COMMITS: usize = 500;
+pub(crate) const MAX_COMMITS: usize = 500;
 const MAX_LINES_PER_FILE: usize = 80;
 const MAX_LINES_PER_COMMIT: usize = 300;
 
@@ -111,7 +92,13 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             }
         }
     }
-    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME | git2::Sort::REVERSE)?;
+    // Newest-first (out from HEAD). Previously this included `REVERSE`, which
+    // walked oldest-first — on a repo with more than MAX_COMMITS history, the
+    // cap below then kept the *oldest* commits and silently dropped HEAD and
+    // everything recent. Collecting newest-first and reversing afterwards
+    // keeps the same oldest→newest display order while actually showing
+    // recent work on large repos.
+    walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
 
     let mut commits: Vec<CommitNode> = Vec::new();
     let head_id = repo.head().ok().and_then(|h| h.target());
@@ -127,18 +114,18 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         true
     })?;
 
-    let mut total_walked = 0usize;
+    let mut truncated = false;
 
     for oid in walk {
-        // ── Commit cap ──────────────────────────────────────────────────
+        // ── Commit cap ── stop as soon as we have enough; no need to keep
+        // draining the rest of a huge history just to count it.
         if commits.len() >= MAX_COMMITS {
-            total_walked += 1;
-            continue; // keep counting but don't parse
+            truncated = true;
+            break;
         }
 
         let oid = oid?;
         let commit = repo.find_commit(oid)?;
-        total_walked += 1;
 
         let author = commit.author();
         let author_name = author.name().unwrap_or("Unknown").to_string();
@@ -174,12 +161,10 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         });
     }
 
-    let truncated = total_walked > MAX_COMMITS;
-    let branches = build_branch_lines(&commits);
-    let main_branch = branches
-        .first()
-        .map(|b| b.commits.clone())
-        .unwrap_or_default();
+    // Walk yielded newest-first; reverse so the rest of the app (which lays
+    // out index 0 as the leftmost/topmost node) sees oldest → newest, same as
+    // before this fix.
+    commits.reverse();
 
     let repo_name = repo
         .workdir()
@@ -202,8 +187,6 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
 
     Ok(RepoTree {
         commits,
-        branches,
-        main_branch,
         repo_name,
         remote_url,
         total_contributors,
@@ -253,19 +236,24 @@ pub fn load_diff_for_commit(repo: &Repository, hash: &str) -> Result<(Vec<FileCh
 
         if total_lines < MAX_LINES_PER_COMMIT {
             if let Ok(Some(patch)) = Patch::from_diff(&diff, delta_idx) {
+                // O(1) from libgit2 — avoids walking every line of a huge
+                // file just to tally +/- counts (the loop below only needs
+                // to run far enough to fill the display cap).
+                if let Ok((_, adds, dels)) = patch.line_stats() {
+                    file_adds = adds;
+                    file_dels = dels;
+                }
+
                 'outer: for hunk_idx in 0..patch.num_hunks() {
                     for line_idx in 0..patch.num_lines_in_hunk(hunk_idx).unwrap_or(0) {
+                        if diff_lines.len() >= MAX_LINES_PER_FILE
+                            || total_lines >= MAX_LINES_PER_COMMIT
+                        {
+                            break 'outer;
+                        }
                         if let Ok(line) = patch.line_in_hunk(hunk_idx, line_idx) {
                             let origin = line.origin();
-                            match origin {
-                                '+' => file_adds += 1,
-                                '-' => file_dels += 1,
-                                _ => {}
-                            }
-                            if matches!(origin, '+' | '-' | ' ')
-                                && diff_lines.len() < MAX_LINES_PER_FILE
-                                && total_lines < MAX_LINES_PER_COMMIT
-                            {
+                            if matches!(origin, '+' | '-' | ' ') {
                                 let content = std::str::from_utf8(line.content())
                                     .unwrap_or("")
                                     .trim_end_matches('\n')
@@ -273,8 +261,6 @@ pub fn load_diff_for_commit(repo: &Repository, hash: &str) -> Result<(Vec<FileCh
                                     .to_string();
                                 diff_lines.push(DiffLine { origin, content });
                                 total_lines += 1;
-                            } else if total_lines >= MAX_LINES_PER_COMMIT {
-                                break 'outer;
                             }
                         }
                     }
@@ -301,48 +287,63 @@ pub fn load_diff_for_commit(repo: &Repository, hash: &str) -> Result<(Vec<FileCh
     Ok((files_changed, stats))
 }
 
-fn build_branch_lines(commits: &[CommitNode]) -> Vec<BranchLine> {
-    let mut lines: Vec<BranchLine> = Vec::new();
-    let mut direction_toggle = true;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    if commits.is_empty() {
-        return lines;
+    /// Regression test for the `Sort::REVERSE` bug: on a repo bigger than
+    /// `MAX_COMMITS`, `parse_repo` must keep the commits nearest HEAD, not
+    /// the oldest ones in the repo's history.
+    #[test]
+    fn parse_repo_keeps_newest_commits_within_cap() {
+        let dir = std::env::temp_dir().join(format!(
+            "git-tree-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let repo = Repository::init(&dir).unwrap();
+
+        let sig = git2::Signature::now("Test", "test@example.com").unwrap();
+        let tree_id = repo.treebuilder(None).unwrap().write().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+
+        let total_commits = MAX_COMMITS * 2;
+        let mut parent_oid: Option<git2::Oid> = None;
+        for i in 0..total_commits {
+            let parents: Vec<git2::Commit> = parent_oid
+                .map(|oid| vec![repo.find_commit(oid).unwrap()])
+                .unwrap_or_default();
+            let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
+            let message = format!("commit {i}");
+            let oid = repo
+                .commit(Some("HEAD"), &sig, &sig, &message, &tree, &parent_refs)
+                .unwrap();
+            parent_oid = Some(oid);
+        }
+
+        let result = parse_repo(&repo).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+
+        assert_eq!(result.commits.len(), MAX_COMMITS);
+        assert!(result.truncated);
+
+        // Oldest → newest display order: the last entry should be HEAD, i.e.
+        // the very last commit created ("commit {total_commits - 1}"), not
+        // an old one from the start of history.
+        let newest = result.commits.last().unwrap();
+        assert!(newest.is_head);
+        assert_eq!(newest.message, format!("commit {}", total_commits - 1));
+
+        // And the window should be contiguous, ending at HEAD: the oldest
+        // commit kept is exactly MAX_COMMITS back from HEAD.
+        let oldest = result.commits.first().unwrap();
+        assert_eq!(
+            oldest.message,
+            format!("commit {}", total_commits - MAX_COMMITS)
+        );
     }
-
-    let main_commits: Vec<String> = commits
-        .iter()
-        .filter(|c| c.parent_hashes.len() <= 1)
-        .map(|c| c.hash.clone())
-        .collect();
-
-    if !main_commits.is_empty() {
-        lines.push(BranchLine {
-            name: "main".to_string(),
-            commits: main_commits,
-            color: "#9B5DE5".to_string(),
-            direction: BranchDirection::Up,
-            parent_hash: String::new(),
-            merge_hash: None,
-        });
-    }
-
-    for commit in commits.iter().filter(|c| c.is_merge) {
-        let dir = if direction_toggle {
-            BranchDirection::Up
-        } else {
-            BranchDirection::Down
-        };
-        direction_toggle = !direction_toggle;
-
-        lines.push(BranchLine {
-            name: format!("branch-{}", commit.short_hash),
-            commits: vec![commit.hash.clone()],
-            color: commit.color.clone(),
-            direction: dir,
-            parent_hash: commit.parent_hashes.first().cloned().unwrap_or_default(),
-            merge_hash: Some(commit.hash.clone()),
-        });
-    }
-
-    lines
 }

@@ -7,6 +7,8 @@ use crate::recent;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 use rfd::AsyncFileDialog;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 // ── OAuth UI state machine ────────────────────────────────────────────────────
 
@@ -39,6 +41,9 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let mut tab = use_signal(|| "local");
     let mut recent_search = use_signal(String::new);
     let mut is_cloning = use_signal(|| false);
+    // Holds the in-flight clone's cancel flag so the Cancel button can flip
+    // it; `None` while nothing is cloning.
+    let mut clone_cancel: Signal<Option<Arc<AtomicBool>>> = use_signal(|| None);
 
     let mut search_input = use_signal(String::new);
 
@@ -59,21 +64,40 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
     let displayed_error = local_error.read().clone().or(props.initial_error.clone());
 
     // ── Open local ────────────────────────────────────────────────────────
+    // `loader::load_local` already runs the git2 work on its own OS thread,
+    // but it then blocks on `.join()` — calling it directly from a click
+    // handler freezes the whole UI (no repaint, no "reading commits..."
+    // message) until it returns. On a huge repo (e.g. Linux kernel) that's
+    // well over a minute of looking hung. Routing it through `spawn` +
+    // a oneshot channel (same pattern `clone_url_fn` below already uses)
+    // keeps the UI thread free while it loads.
+    let on_load = props.on_load;
     let mut open_local = move |path_str: String| {
         if path_str.is_empty() {
             local_error.set(Some("Please enter a path.".into()));
             return;
         }
+        local_error.set(None);
         props.on_loading.call("reading commits...".into());
         let path = std::path::PathBuf::from(&path_str);
-        match loader::load_local(&path) {
-            Ok(tree) => {
-                let _ = recent::save_recent(&path_str, &tree.repo_name);
-                recent_repos.set(recent::load_recent());
-                props.on_load.call(tree);
+
+        spawn(async move {
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            std::thread::spawn(move || {
+                let result = loader::load_local(&path);
+                let _ = tx.send(result);
+            });
+
+            match rx.await {
+                Ok(Ok(tree)) => {
+                    let _ = recent::save_recent(&path_str, &tree.repo_name);
+                    recent_repos.set(recent::load_recent());
+                    on_load.call(tree);
+                }
+                Ok(Err(e)) => local_error.set(Some(format!("Error: {e}"))),
+                Err(_) => local_error.set(Some("Repo loading task panicked".into())),
             }
-            Err(e) => local_error.set(Some(format!("Error: {e}"))),
-        }
+        });
     };
 
     // ── Filtered recents ──────────────────────────────────────────────────
@@ -98,6 +122,9 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
         cloning_url.set(Some(url.clone()));
         is_cloning.set(true);
 
+        let cancel = Arc::new(AtomicBool::new(false));
+        clone_cancel.set(Some(Arc::clone(&cancel)));
+
         let token = auth_token.read().clone();
         let clone_url = if let Some(ref t) = token {
             inject_token_into_url(&url, &t.access_token)
@@ -107,34 +134,66 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
 
         spawn(async move {
             let (tx, rx) = tokio::sync::oneshot::channel();
+            let cancel_for_thread = Arc::clone(&cancel);
             std::thread::spawn(move || {
-                let result = loader::load_remote(&clone_url);
+                let result = loader::load_remote(&clone_url, cancel_for_thread);
                 let _ = tx.send(result);
             });
 
-            match rx.await {
-                Ok(Ok(tree)) => {
+            // Polls instead of a plain `rx.await` — see `await_cancellable`'s
+            // own docs for why `cancel` alone isn't always enough to
+            // interrupt a stuck git2 call, and why this is what actually
+            // keeps the UI responsive regardless.
+            let outcome =
+                loader::await_cancellable(rx, &cancel, std::time::Duration::from_millis(150)).await;
+
+            match outcome {
+                Some(Ok(Ok(tree))) => {
                     is_cloning.set(false);
                     cloning_url.set(None);
+                    clone_cancel.set(None);
                     props.on_load.call(tree);
                 }
-                Ok(Err(e)) => {
+                Some(Ok(Err(e))) => {
                     is_cloning.set(false);
                     cloning_url.set(None);
-                    let msg = format!("Clone failed for {display_name}: {e}");
+                    clone_cancel.set(None);
+                    let msg = if e.to_string() == loader::CLONE_CANCELLED {
+                        format!("Clone of {display_name} cancelled.")
+                    } else {
+                        format!("Clone failed for {display_name}: {e}")
+                    };
                     if *tab.read() == "search" {
                         search_error.set(Some(msg));
                     } else {
                         local_error.set(Some(msg));
                     }
                 }
-                Err(_) => {
+                Some(Err(_)) => {
                     is_cloning.set(false);
                     cloning_url.set(None);
+                    clone_cancel.set(None);
                     search_error.set(Some("Clone task panicked".into()));
+                }
+                None => {
+                    is_cloning.set(false);
+                    cloning_url.set(None);
+                    clone_cancel.set(None);
+                    let msg = format!("Clone of {display_name} cancelled.");
+                    if *tab.read() == "search" {
+                        search_error.set(Some(msg));
+                    } else {
+                        local_error.set(Some(msg));
+                    }
                 }
             }
         });
+    };
+
+    let cancel_clone = move |_| {
+        if let Some(flag) = clone_cancel.read().as_ref() {
+            flag.store(true, Ordering::Relaxed);
+        }
     };
 
     rsx! {
@@ -212,12 +271,24 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                                 local_error.set(None);
                                 props.on_loading.call("reading commits...".into());
                                 let path = std::path::PathBuf::from(&path_str);
-                                match loader::load_local(&path) {
-                                    Ok(tree)  => props.on_load.call(tree),
-                                    Err(e)    => local_error.set(
-                                        Some(format!("Error: {}", e))
-                                    ),
-                                }
+
+                                spawn(async move {
+                                    let (tx, rx) = tokio::sync::oneshot::channel();
+                                    std::thread::spawn(move || {
+                                        let result = loader::load_local(&path);
+                                        let _ = tx.send(result);
+                                    });
+
+                                    match rx.await {
+                                        Ok(Ok(tree)) => props.on_load.call(tree),
+                                        Ok(Err(e)) => local_error.set(
+                                            Some(format!("Error: {e}"))
+                                        ),
+                                        Err(_) => local_error.set(
+                                            Some("Repo loading task panicked".into())
+                                        ),
+                                    }
+                                });
                             },
                             "OPEN →"
                         }
@@ -254,10 +325,18 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
 
                     if *is_cloning.read() {
                         div {
-                            class: "loading-cursor",
-                            style: "font-size: 11px; letter-spacing: 0.1em; margin-top: 4px;",
-                            "> cloning repository "
-                            span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                            style: "display: flex; align-items: center; gap: 10px; margin-top: 4px;",
+                            div {
+                                class: "loading-cursor",
+                                style: "font-size: 11px; letter-spacing: 0.1em;",
+                                "> cloning repository "
+                                span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                            }
+                            button {
+                                class: "toolbar-btn",
+                                onclick: cancel_clone,
+                                "[ CANCEL ]"
+                            }
                         }
                     }
                 }
@@ -545,10 +624,18 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     if *is_cloning.read() {
                         if let Some(url) = cloning_url.read().clone() {
                             div {
-                                class: "loading-cursor",
-                                style: "font-size: 11px; letter-spacing: 0.1em;",
-                                "> cloning {url} "
-                                span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                                style: "display: flex; align-items: center; gap: 10px;",
+                                div {
+                                    class: "loading-cursor",
+                                    style: "font-size: 11px; letter-spacing: 0.1em;",
+                                    "> cloning {url} "
+                                    span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                                }
+                                button {
+                                    class: "toolbar-btn",
+                                    onclick: cancel_clone,
+                                    "[ CANCEL ]"
+                                }
                             }
                         }
                     }
@@ -629,7 +716,6 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         UserRepos {
                             token: token.access_token.clone(),
                             on_load: props.on_load,
-                            on_loading: props.on_loading,
                         }
                     }
                 }

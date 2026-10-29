@@ -3,6 +3,8 @@ use crate::git::auth::{fetch_profile, fetch_user_repos, GithubProfile, GithubRep
 use crate::git::loader;
 use crate::git::parser::RepoTree;
 use dioxus::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 #[derive(Clone, PartialEq)]
 enum LoadState {
@@ -20,11 +22,7 @@ enum SortBy {
 }
 
 #[component]
-pub fn UserRepos(
-    token: String,
-    on_load: EventHandler<RepoTree>,
-    on_loading: EventHandler<String>,
-) -> Element {
+pub fn UserRepos(token: String, on_load: EventHandler<RepoTree>) -> Element {
     let mut load_state = use_signal(|| LoadState::Idle);
     let mut profile: Signal<Option<GithubProfile>> = use_signal(|| None);
 
@@ -35,6 +33,9 @@ pub fn UserRepos(
     let mut show_private = use_signal(|| true);
     let mut cloning_url = use_signal(|| Option::<String>::None);
     let mut clone_error = use_signal(|| Option::<String>::None);
+    // Holds the in-flight clone's cancel flag so the Cancel button can flip
+    // it; `None` while nothing is cloning.
+    let mut clone_cancel: Signal<Option<Arc<AtomicBool>>> = use_signal(|| None);
 
     // ── Auto-load on mount ────────────────────────────────────────────────
     let token_for_effect = token.clone();
@@ -289,6 +290,29 @@ pub fn UserRepos(
                     "— {displayed.read().len()} REPOSITORIES —"
                 }
 
+                // Cloning indicator + cancel
+                if let Some(url) = cloning_url.read().clone() {
+                    div {
+                        style: "display: flex; align-items: center; justify-content: center; \
+                                gap: 10px;",
+                        div {
+                            class: "loading-cursor",
+                            style: "font-size: 11px; letter-spacing: 0.1em;",
+                            "> cloning {url} "
+                            span { class: "loading-blink", style: "font-size: 13px;", "█" }
+                        }
+                        button {
+                            class: "toolbar-btn",
+                            onclick: move |_| {
+                                if let Some(flag) = clone_cancel.read().as_ref() {
+                                    flag.store(true, Ordering::Relaxed);
+                                }
+                            },
+                            "[ CANCEL ]"
+                        }
+                    }
+                }
+
                 // Clone error
                 if let Some(ref err) = *clone_error.read() {
                     p { class: "error-msg", "! {err}" }
@@ -365,31 +389,67 @@ pub fn UserRepos(
                                                     clone_error.set(None);
                                                     cloning_url.set(Some(repo.clone_url.clone()));
 
+                                                    let cancel = Arc::new(AtomicBool::new(false));
+                                                    clone_cancel.set(Some(Arc::clone(&cancel)));
+
                                                     let clone_url = format!(
                                                         "https://{}@{}",
                                                         token,
                                                         repo.clone_url.trim_start_matches("https://")
                                                     );
-
-                                                    on_loading.call(format!("cloning {}...", repo.name));
+                                                    let display_name = repo.name.clone();
 
                                                     spawn(async move {
                                                         let (tx, rx) = tokio::sync::oneshot::channel();
+                                                        let cancel_for_thread = Arc::clone(&cancel);
                                                         std::thread::spawn(move || {
-                                                            let _ = tx.send(loader::load_remote(&clone_url));
+                                                            let result = loader::load_remote(
+                                                                &clone_url,
+                                                                cancel_for_thread,
+                                                            );
+                                                            let _ = tx.send(result);
                                                         });
-                                                        match rx.await {
-                                                            Ok(Ok(tree)) => {
+
+                                                        // See `loader::await_cancellable`'s docs for
+                                                        // why this polls instead of awaiting `rx`
+                                                        // directly.
+                                                        let outcome = loader::await_cancellable(
+                                                            rx,
+                                                            &cancel,
+                                                            std::time::Duration::from_millis(150),
+                                                        ).await;
+
+                                                        match outcome {
+                                                            Some(Ok(Ok(tree))) => {
                                                                 cloning_url.set(None);
+                                                                clone_cancel.set(None);
                                                                 on_load.call(tree);
                                                             }
-                                                            Ok(Err(e)) => {
+                                                            Some(Ok(Err(e))) => {
                                                                 cloning_url.set(None);
-                                                                clone_error.set(Some(format!("Clone failed: {e}")));
+                                                                clone_cancel.set(None);
+                                                                let msg = if e.to_string()
+                                                                    == loader::CLONE_CANCELLED
+                                                                {
+                                                                    format!("Clone of {display_name} cancelled.")
+                                                                } else {
+                                                                    format!("Clone failed: {e}")
+                                                                };
+                                                                clone_error.set(Some(msg));
                                                             }
-                                                            Err(_) => {
+                                                            Some(Err(_)) => {
                                                                 cloning_url.set(None);
-                                                                clone_error.set(Some("Clone task panicked".into()));
+                                                                clone_cancel.set(None);
+                                                                clone_error.set(
+                                                                    Some("Clone task panicked".into())
+                                                                );
+                                                            }
+                                                            None => {
+                                                                cloning_url.set(None);
+                                                                clone_cancel.set(None);
+                                                                clone_error.set(Some(format!(
+                                                                    "Clone of {display_name} cancelled."
+                                                                )));
                                                             }
                                                         }
                                                     });
