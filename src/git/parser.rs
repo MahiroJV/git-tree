@@ -110,7 +110,11 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         tag_map.entry(oid.to_string()).or_default().push(tag_name);
         true
     })?;
-    eprintln!("[parse] tags: {:?} ({} tagged commits)", t_tags.elapsed(), tag_map.len());
+    eprintln!(
+        "[parse] tags: {:?} ({} tagged commits)",
+        t_tags.elapsed(),
+        tag_map.len()
+    );
     let t_walk = std::time::Instant::now();
     let mut first = true;
 
