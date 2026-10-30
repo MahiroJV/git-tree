@@ -81,6 +81,7 @@ const MAX_LINES_PER_COMMIT: usize = 300;
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
 pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
+    let t_start = std::time::Instant::now();
     let mut walk = repo.revwalk()?;
     walk.push_head()?;
 
@@ -92,13 +93,9 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             }
         }
     }
-    // Newest-first (out from HEAD). Previously this included `REVERSE`, which
-    // walked oldest-first — on a repo with more than MAX_COMMITS history, the
-    // cap below then kept the *oldest* commits and silently dropped HEAD and
-    // everything recent. Collecting newest-first and reversing afterwards
-    // keeps the same oldest→newest display order while actually showing
-    // recent work on large repos.
     walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
+    eprintln!("[parse] setup: {:?}", t_start.elapsed());
+    let t_tags = std::time::Instant::now();
 
     let mut commits: Vec<CommitNode> = Vec::new();
     let head_id = repo.head().ok().and_then(|h| h.target());
@@ -113,6 +110,9 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         tag_map.entry(oid.to_string()).or_default().push(tag_name);
         true
     })?;
+    eprintln!("[parse] tags: {:?} ({} tagged commits)", t_tags.elapsed(), tag_map.len());
+    let t_walk = std::time::Instant::now();
+    let mut first = true;
 
     let mut truncated = false;
 
@@ -125,6 +125,10 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
         }
 
         let oid = oid?;
+        if first {
+            eprintln!("[parse] first commit arrived after: {:?}", t_walk.elapsed());
+            first = false;
+        }
         let commit = repo.find_commit(oid)?;
 
         let author = commit.author();
@@ -160,6 +164,7 @@ pub fn parse_repo(repo: &Repository) -> Result<RepoTree> {
             hash,
         });
     }
+    eprintln!("[parse] whole loop: {:?}", t_walk.elapsed());
 
     // Walk yielded newest-first; reverse so the rest of the app (which lays
     // out index 0 as the leftmost/topmost node) sees oldest → newest, same as

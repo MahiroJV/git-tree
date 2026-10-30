@@ -32,7 +32,7 @@ Explore branches, inspect commits, view diffs, and analyze repository activity i
 ---
 
 ## Screenshots
-<details>
+
 <summary>Screenshot Gallery</summary>
 
 <p align="center">
@@ -46,7 +46,7 @@ Explore branches, inspect commits, view diffs, and analyze repository activity i
     <img src="assets/screenshot/sc8.png" width="100%" />
 </p>
 
-</details>
+
 
 ---
 ## ⚡ Features

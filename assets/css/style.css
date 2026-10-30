@@ -517,11 +517,12 @@ body,
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     height: 100%;
     gap: 28px;
     padding: 40px;
     background: var(--bg);
+    overflow-y: auto;
 }
 
 .ascii-header {
@@ -1463,3 +1464,10 @@ body,
     white-space: nowrap;
 }
 .update-banner__close:hover { opacity: 1; }
+.home-screen > :first-child { margin-top: auto; }
+.home-screen > :last-child  { margin-bottom: auto; }
+
+/* every child, not just first */
+.home-screen > * {
+    flex-shrink: 0;
+}
