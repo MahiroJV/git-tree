@@ -156,6 +156,78 @@ chmod +x git-tree-*-x86_64.AppImage
 ./git-tree-*-x86_64.AppImage
 ```
 ---
+
+### ↩️ Restore the original state (uninstall / undo)
+
+If nothing above worked, or you just want to remove git-tree, this undoes every change the install steps made.
+
+#### 🗑️ Uninstall script (recommended)
+
+The script finds how git-tree was installed and removes it, asking before anything that needs `sudo`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MahiroJV/git-tree/master/scripts/uninstall.sh -o uninstall.sh
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+| Option | What it does |
+|---|---|
+| *(none)* | Remove the app, keep your settings |
+| `--purge` | Also delete settings, recent repos and GitHub login |
+| `--yes` | Don't ask for confirmation |
+
+From a clone of this repo, just run `./scripts/uninstall.sh`.
+
+> System packages (webkit2gtk, gtk3, xdotool, …) are never removed, because other apps often need them.
+
+#### Manual uninstall
+
+Prefer to do it by hand? Run only the parts that match how you installed it.
+
+**Installed with `install.sh`:**
+```bash
+rm -f ~/.local/bin/git-tree
+rm -f ~/.local/share/applications/git-tree.desktop
+rm -f ~/.local/share/icons/hicolor/256x256/apps/git-tree.png
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+
+**Arch: remove the `libxdo.so.3` symlink** (created by `install.sh` or by hand).
+Only delete it if no package owns it:
+```bash
+pacman -Qo /usr/lib/libxdo.so.3 || sudo rm /usr/lib/libxdo.so.3
+```
+
+**Installed the binary manually:**
+```bash
+sudo rm -f /usr/local/bin/git-tree
+```
+
+**Installed from the AUR:**
+```bash
+sudo pacman -Rns git-tree-bin
+```
+
+**NixOS:**
+```bash
+nix profile remove git-tree      # if you used `nix profile install`
+nix-collect-garbage              # free the space in /nix/store
+```
+If you added it to `configuration.nix` / `home.nix`, remove that line and rebuild (`sudo nixos-rebuild switch` or `home-manager switch`).
+If you used the `libxdo` symlink workaround, remove it and open a new terminal so `LD_LIBRARY_PATH` is reset:
+```bash
+rm -rf /tmp/libxdo
+```
+
+**Reset settings, recent repos and GitHub login** (optional, for all install methods):
+```bash
+rm -rf ~/.config/git-tree ~/.local/share/git-tree
+```
+
+> System packages installed in step 1 (webkit2gtk, gtk3, xdotool, …) are left alone on purpose, because other apps often need them. Remove them with your package manager only if you're sure nothing else uses them.
+
+---
 # Documentation
 **If you have any problems with installation, please check the [Wiki](https://github.com/MahiroJV/git-tree/wiki).**
 
