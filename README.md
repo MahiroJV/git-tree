@@ -100,6 +100,38 @@ curl -fsSL https://raw.githubusercontent.com/MahiroJV/git-tree/master/install.sh
 ```bash
 sudo dnf install libgit2-devel webkit2gtk4.1-devel gtk3-devel
 ```
+
+## ![NixOS](https://img.shields.io/badge/NixOS-5277C3?style=for-the-badge&logo=nixos&logoColor=white)
+
+The prebuilt binary links against Ubuntu's `libxdo.so.3` and won't run on NixOS
+(nixpkgs ships `libxdo.so.4`). Build from source instead — no extra setup needed:
+
+```bash
+# Flakes: run without installing
+nix run github:MahiroJV/git-tree
+
+# Flakes: install to your profile
+nix profile install github:MahiroJV/git-tree
+```
+
+```bash
+# Classic Nix (from a clone of this repo)
+nix-shell
+cargo run --release
+```
+
+Or add it to a flake-based NixOS / home-manager configuration:
+
+```nix
+inputs.git-tree.url = "github:MahiroJV/git-tree";
+
+# then in configuration.nix / home.nix:
+environment.systemPackages = [ inputs.git-tree.packages.${pkgs.system}.default ];
+```
+
+> Don't symlink `libxdo.so.4` → `libxdo.so.3`; it only works by luck.
+> If the window is black, try `WEBKIT_DISABLE_COMPOSITING_MODE=1 git-tree`
+> (`WEBKIT_DISABLE_DMABUF_RENDERER=1` is already set by the app).
 ---
 
 **2. Download the binary**
