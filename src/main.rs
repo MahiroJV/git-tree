@@ -23,6 +23,16 @@ fn main() {
         if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
+
+        // On native Wayland (seen on GNOME) the title-bar buttons — close,
+        // minimize, maximize — ignore clicks until the window is maximized
+        // once. Under XWayland they work, so prefer it when it's available.
+        // Set GDK_BACKEND yourself (e.g. GDK_BACKEND=wayland) to override.
+        let on_wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
+        let xwayland_available = std::env::var_os("DISPLAY").is_some();
+        if on_wayland && xwayland_available && std::env::var_os("GDK_BACKEND").is_none() {
+            std::env::set_var("GDK_BACKEND", "x11");
+        }
     }
 
     let icon_bytes = include_bytes!("../assets/icon/png/icon.png");
@@ -47,6 +57,14 @@ fn main() {
             ))
             .with_resizable(true),
     );
+
+    // Dioxus adds a default "Window / Edit" menu bar. On Linux most of its
+    // "Window" items (hide, show all, …) are macOS-only, so the menu opens
+    // empty (seen on Wayland/NixOS). The app has its own toolbar, and copy/
+    // paste works in the webview without the menu, so drop it. macOS keeps it
+    // for the standard app menu (Cmd+Q, Cmd+C/V).
+    #[cfg(not(target_os = "macos"))]
+    let config = config.with_menu(None);
 
     LaunchBuilder::desktop().with_cfg(config).launch(App);
 }

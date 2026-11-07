@@ -37,8 +37,14 @@ install_deps() {
 
     case "$DISTRO" in
         arch)
-            sudo pacman -Sy --needed \
-                webkit2gtk \
+            # --noconfirm: when run as `curl ... | bash`, pacman's [Y/n] prompt
+            # would read the rest of this script from stdin instead of the keyboard
+            # -S, not -Sy: syncing the database without upgrading (-Sy pkg) is a
+            # partial upgrade, which Arch doesn't support and can break the system.
+            # webkit2gtk-4.1: git-tree links libwebkit2gtk-4.1; the old
+            # "webkit2gtk" (4.0) package no longer exists in the Arch repos.
+            sudo pacman -S --needed --noconfirm \
+                webkit2gtk-4.1 \
                 libgit2 \
                 xdotool \
                 gtk3 \
@@ -110,8 +116,13 @@ chmod +x "$INSTALL_DIR/$BIN_NAME"
 
 mkdir -p "$ICON_DIR"
 
-if [ -f "assets/icon/icon.png" ]; then
-    cp assets/icon/icon.png "$ICON_DIR/git-tree.png"
+# Use the local copy when run from a clone, otherwise download it
+# (with `curl ... | bash` there are no repo files on disk).
+if [ -f "assets/icon/png/icon.png" ]; then
+    cp assets/icon/png/icon.png "$ICON_DIR/git-tree.png"
+else
+    curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPO/master/assets/icon/png/icon.png" \
+        -o "$ICON_DIR/git-tree.png" || echo "Warning: could not download icon"
 fi
 
 # ─────────────────────────────────────────────

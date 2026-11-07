@@ -51,9 +51,23 @@
     animation: line-draw 0.9s ease-out forwards;
 }
 
+/* The spine can be longer than any fixed dash length (100+ commits), so its
+   real length comes in from tree_canvas.rs as --spine-len. A fixed 9999 cut
+   the line off after ~83 commits. */
 .spine-animated {
-    stroke-dasharray: 9999;
-    animation: line-draw 1s ease-out forwards;
+    stroke-dasharray: var(--spine-len, 9999);
+    animation: spine-draw 1s ease-out forwards;
+}
+
+@keyframes spine-draw {
+    from {
+        stroke-dashoffset: var(--spine-len, 9999);
+        opacity: 0;
+    }
+    to {
+        stroke-dashoffset: 0;
+        opacity: 1;
+    }
 }
 
 /* ── Panel slide-in ── */

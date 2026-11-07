@@ -266,6 +266,12 @@ pub fn TreeCanvas(
 
     let canvas_width = layout.read().canvas_width;
     let canvas_height = layout.read().canvas_height;
+    // Spine runs from 40 to (size - 40); +1 so the dash fully covers it.
+    let spine_len = if is_vertical {
+        canvas_height - 79.0
+    } else {
+        canvas_width - 79.0
+    };
     let match_count = layout.read().match_count;
     let positioned: Vec<(CommitNode, f64, f64, bool)> = layout.read().positioned.clone();
     let mm_positioned = positioned.clone();
@@ -566,6 +572,7 @@ pub fn TreeCanvas(
                     if is_vertical {
                         line {
                             class: "spine-animated",
+                            style: "--spine-len: {spine_len}",
                             x1: "{V_H_MAIN}", y1: "40",
                             x2: "{V_H_MAIN}", y2: "{canvas_height - 40.0}",
                             stroke: "var(--accent)", stroke_width: "2",
@@ -574,6 +581,7 @@ pub fn TreeCanvas(
                     } else {
                         line {
                             class: "spine-animated",
+                            style: "--spine-len: {spine_len}",
                             x1: "40",
                             y1: "{H_V_MAIN}",
                             x2: "{canvas_width - 40.0}",
