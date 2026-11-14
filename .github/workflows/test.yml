@@ -2,7 +2,7 @@ name: Test
 
 # Runs on every push and PR — fast feedback before builds.
 # Single file, matrix strategy: Linux + Windows in parallel.
-# Android is fmt/clippy only — can't run a desktop Dioxus app on Android runners.
+# Android is covered by build-android.yml (clippy on the mobile feature + APK build).
 
 on:
   push:
@@ -93,8 +93,10 @@ jobs:
       # tests. As you add tests (e.g. parser logic, search helpers, theme
       # functions) they will be picked up automatically here.
 
+      # Not --all-features: `desktop` and `mobile` are exclusive (main.rs
+      # rejects both at once). Default features = desktop.
       - name: Run tests
-        run: cargo test --all-features -- --nocapture
+        run: cargo test -- --nocapture
         env:
           OPENSSL_STATIC: ${{ matrix.runner == 'windows-latest' && '1' || '' }}
           # Suppress GUI-related panics in headless CI

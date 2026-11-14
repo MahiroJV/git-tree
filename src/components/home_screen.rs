@@ -6,7 +6,6 @@ use crate::git::search::{fmt_stars, search_github, SearchResult};
 use crate::recent;
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use rfd::AsyncFileDialog;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -161,7 +160,7 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                     let msg = if e.to_string() == loader::CLONE_CANCELLED {
                         format!("Clone of {display_name} cancelled.")
                     } else {
-                        format!("Clone failed for {display_name}: {e}")
+                        format!("Clone failed for {display_name}: {e:#}")
                     };
                     if *tab.read() == "search" {
                         search_error.set(Some(msg));
@@ -241,24 +240,26 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         input {
                             class: "terminal-input",
                             r#type: "text",
+                            // Phone keyboards would capitalize "Https://".
+                            "autocapitalize": "off",
+                            "autocorrect": "off",
+                            spellcheck: "false",
                             placeholder: "/home/user/my-project",
                             value: "{local_path}",
                             oninput: move |e| local_path.set(e.value()),
                         }
-                        button {
-                            class: "btn-primary",
-                            onclick: move |_| {
-                                spawn(async move {
-                                    if let Some(folder) =
-                                        AsyncFileDialog::new().pick_folder().await
-                                    {
-                                        local_path.set(
-                                            folder.path().to_string_lossy().to_string()
-                                        );
-                                    }
-                                });
-                            },
-                            "📁"
+                        if crate::platform::CAN_PICK_FOLDER {
+                            button {
+                                class: "btn-primary",
+                                onclick: move |_| {
+                                    spawn(async move {
+                                        if let Some(folder) = crate::platform::pick_folder().await {
+                                            local_path.set(folder);
+                                        }
+                                    });
+                                },
+                                "📁"
+                            }
                         }
                         button {
                             class: "btn-primary",
@@ -302,6 +303,11 @@ pub fn HomeScreen(props: HomeScreenProps) -> Element {
                         input {
                             class: "terminal-input",
                             r#type: "text",
+                            // Phone keyboards would capitalize "Https://".
+                            "autocapitalize": "off",
+                            "autocorrect": "off",
+                            spellcheck: "false",
+                            "inputmode": "url",
                             placeholder: "https://github.com/user/repo",
                             value: "{remote_url}",
                             disabled: *is_cloning.read(),

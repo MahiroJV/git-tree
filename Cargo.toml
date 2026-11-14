@@ -13,8 +13,9 @@ readme = "README.md"
 exclude = ["assets/fonts/*.ttf", ".idea/"]
 
 [dependencies]
-dioxus = { version = "0.6", features = ["desktop"] }
-rfd = "0.17.2"
+dioxus = { version = "0.6" }
+# Native file dialogs — desktop only (no Android backend).
+rfd = { version = "0.17.2", optional = true }
 git2 = { version = "0.19", features = ["vendored-libgit2"] }
 tokio = { version = "1.52.0", features = ["rt-multi-thread", "time"] }
 serde = { version = "1", features = ["derive"] }
@@ -26,10 +27,17 @@ chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
 image = "0.25.10"
 web-sys = { version = "0.3.97", features = ["Navigator"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
 urlencoding = "2"
 openssl = { version = "0.10", features = ["vendored"] }
 webbrowser = "0.8"
+
+[features]
+default = ["desktop"]
+# Linux / Windows / macOS app (webview window + native file dialogs).
+desktop = ["dioxus/desktop", "dep:rfd"]
+# Android (and later iOS): `dx bundle --platform android`.
+mobile = ["dioxus/mobile"]
 
 [profile.release]
 opt-level = 3

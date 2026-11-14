@@ -1,0 +1,165 @@
+name: Deploy — Android
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  BINARY_NAME: git-tree
+  ANDROID_BUILD_TOOLS: "34.0.0"
+
+jobs:
+  # ── 1. Tests ───────────────────────────────────────────────────────────────
+  test:
+    uses: ./.github/workflows/test.yml
+
+  # ── 2. Build ───────────────────────────────────────────────────────────────
+  build:
+    needs: test
+    uses: ./.github/workflows/build-android.yml
+
+  # ── 3. Package — sign (if a keystore is configured) + checksum ─────────────
+  package:
+    name: Package Android
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      - name: Rename APK
+        run: |
+          VERSION="${{ github.ref_name }}"
+          APK=$(ls dist/*.apk | head -1)
+          mv "$APK" "dist/${{ env.BINARY_NAME }}-${VERSION}-android-arm64.apk"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "APK=dist/${{ env.BINARY_NAME }}-${VERSION}-android-arm64.apk" >> "$GITHUB_ENV"
+
+      # dx signs with a throw-away debug key, which differs on every CI run,
+      # so Android refuses to update one release over another. With a real
+      # keystore in secrets (see README → Android → Release signing) the APK
+      # is re-signed with a stable key instead. Secrets can't be read in
+      # `if:`, so expose their presence through an env var first.
+      - name: Check for signing keystore
+        run: echo "HAS_KEYSTORE=${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}" >> "$GITHUB_ENV"
+
+      - name: Install JDK 17
+        if: env.HAS_KEYSTORE == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android build-tools
+        if: env.HAS_KEYSTORE == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+
+      - name: Re-sign APK with release key
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          TOOLS="$ANDROID_HOME/build-tools/${{ env.ANDROID_BUILD_TOOLS }}"
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          "$TOOLS/zipalign" -f -p 4 "$APK" aligned.apk
+          "$TOOLS/apksigner" sign \
+            --ks release.jks \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out "$APK" aligned.apk
+          "$TOOLS/apksigner" verify --print-certs "$APK"
+          rm -f release.jks aligned.apk
+          echo "SIGNING=release" >> "$GITHUB_ENV"
+
+      - name: Note debug signing
+        if: env.HAS_KEYSTORE != 'true'
+        run: echo "SIGNING=debug" >> "$GITHUB_ENV"
+
+      - name: Compute SHA256
+        run: |
+          cd dist
+          sha256sum ${{ env.BINARY_NAME }}-${{ env.VERSION }}-android-arm64.apk \
+            > SHA256SUMS-android.txt
+          echo "signing=${SIGNING}" > SIGNING-android.txt
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-packaged-${{ github.ref_name }}
+          path: dist/
+          retention-days: 7
+
+  # ── 4. GitHub Release ──────────────────────────────────────────────────────
+  release:
+    name: GitHub Release (Android)
+    needs: [build, package]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-packaged-${{ github.ref_name }}
+          path: dist/
+
+      - name: Build release notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          SIGNING=$(cut -d= -f2 dist/SIGNING-android.txt)
+          rm -f dist/SIGNING-android.txt
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[?${VERSION#v}\]?/{found=1; next} found && /^## /{exit} found{print}" \
+              CHANGELOG.md > release_notes.txt
+          fi
+          if [ ! -s release_notes.txt ]; then
+            cat > release_notes.txt << 'EOF'
+          ## Android Installation (experimental)
+
+          1. Download `git-tree-*-android-arm64.apk` on the phone.
+          2. Open it from the Downloads folder and allow installing from this
+             source if asked. Play Protect may warn about an unknown developer.
+          3. On the phone you **clone** repositories (into app storage); the
+             local-folder picker is desktop only.
+
+          **Requirements:** Android 7.0+ on a 64-bit ARM phone (nearly all
+          phones from the last few years).
+          EOF
+            if [ "$SIGNING" = "debug" ]; then
+              cat >> release_notes.txt << 'EOF'
+
+          > This APK is signed with a CI debug key. Android will not update
+          > an older git-tree over it — uninstall the previous version first.
+          EOF
+            fi
+          fi
+
+      # softprops/action-gh-release UPDATES an existing release for the same
+      # tag (made by the Linux/Windows/macOS deploys) and adds the APK to it.
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "git-tree ${{ github.ref_name }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/${{ env.BINARY_NAME }}-${{ github.ref_name }}-android-arm64.apk
+            dist/SHA256SUMS-android.txt

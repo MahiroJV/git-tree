@@ -1,0 +1,101 @@
+name: Build — Android
+
+# Builds the arm64 APK with the Dioxus CLI. Uses scripts/android-setup.sh
+# so CI and local builds run exactly the same command.
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Name of the uploaded artifact"
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: git-tree
+  # Must match NDK_VERSION / PLATFORM / BUILD_TOOLS in scripts/android-setup.sh
+  NDK_VERSION: "27.2.12479018"
+  ANDROID_PLATFORM: "android-34"
+  ANDROID_BUILD_TOOLS: "34.0.0"
+  DIOXUS_CLI_VERSION: "0.6.3"
+
+jobs:
+  build:
+    name: Build Android arm64
+    runs-on: ubuntu-latest
+    # First build compiles vendored OpenSSL + libgit2 for Android
+    timeout-minutes: 60
+
+    outputs:
+      artifact-name: ${{ steps.meta.outputs.artifact-name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable + Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: aarch64-linux-android
+
+      # Gradle (as driven by dx 0.6) needs JDK 17
+      - name: Install JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android SDK + NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: >-
+            platform-tools
+            platforms;${{ env.ANDROID_PLATFORM }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+            ndk;${{ env.NDK_VERSION }}
+
+      - name: Export NDK path
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      # Prebuilt dx binary when available, otherwise compiled from source
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install Dioxus CLI
+        run: cargo binstall dioxus-cli@${{ env.DIOXUS_CLI_VERSION }} --no-confirm --locked
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      # The mobile feature compiles on the host too, so lint it here without
+      # paying for a second NDK build.
+      - name: Clippy (mobile feature)
+        run: cargo clippy --no-default-features --features mobile -- -D warnings
+
+      - name: Build APK
+        run: ./scripts/android-setup.sh build
+
+      - name: Set artifact metadata
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "artifact-name=${{ env.BINARY_NAME }}-android-${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact-name }}
+          path: dist/*.apk
+          retention-days: 7
+          if-no-files-found: error

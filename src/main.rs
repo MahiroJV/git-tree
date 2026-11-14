@@ -1,20 +1,44 @@
 #![windows_subsystem = "windows"]
 use app::App;
+#[cfg(feature = "desktop")]
 use dioxus::desktop::tao::window::Icon;
+#[cfg(feature = "desktop")]
 use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
-#[allow(unused_imports)]
+#[cfg(feature = "desktop")]
 use image::load_from_memory;
+
+#[cfg(all(feature = "desktop", feature = "mobile"))]
+compile_error!(
+    "features `desktop` and `mobile` are exclusive — build Android with \
+     `--no-default-features --features mobile`"
+);
 
 mod app;
 mod components;
 mod git;
+mod platform;
 mod recent;
 mod settings_store;
 mod theme;
 mod updater;
 
 fn main() {
+    // Point HOME / XDG dirs / TMPDIR at app-private storage on Android so
+    // `dirs::config_dir()` and `std::env::temp_dir()` work. No-op elsewhere.
+    platform::init();
+
+    #[cfg(feature = "mobile")]
+    {
+        LaunchBuilder::mobile().launch(App);
+    }
+
+    #[cfg(feature = "desktop")]
+    launch_desktop();
+}
+
+#[cfg(feature = "desktop")]
+fn launch_desktop() {
     // WebKitGTK's DMA-BUF renderer shows a black/blank window on NixOS,
     // NVIDIA and some Wayland compositors. Disable it unless the user
     // explicitly set the variable themselves. Must run before any threads start.

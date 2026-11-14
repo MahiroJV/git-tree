@@ -9,3 +9,10 @@ title = "git-tree"
 
 [desktop.app]
 filename = "git-tree"
+
+# Used by `dx bundle` — Android needs a reverse-DNS package id.
+[bundle]
+identifier = "io.github.mahirojv.gittree"
+publisher = "MahiroJV"
+icon = ["assets/icon/png/icon.png"]
+short_description = "A terminal-style git branch visualizer"

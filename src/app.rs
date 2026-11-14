@@ -21,6 +21,7 @@ use dioxus::prelude::*;
 
 const BASE_CSS: &str = include_str!("../assets/css/style.css");
 const MODERN_CSS: &str = include_str!("../assets/css/modern.css");
+const MOBILE_CSS: &str = include_str!("../assets/css/mobile.css");
 
 // ── Screen enum ───────────────────────────────────────────────────────────────
 
@@ -88,8 +89,9 @@ pub fn App() -> Element {
     };
 
     let mut search_query = use_signal(String::new);
-    let mut left_open = use_signal(|| true);
-    let mut right_open = use_signal(|| true);
+    // Phones are too narrow for both side panels, so start with them closed.
+    let mut left_open = use_signal(|| !cfg!(target_os = "android"));
+    let mut right_open = use_signal(|| !cfg!(target_os = "android"));
 
     // ── Update state ───────────────────────────────────────────────────────
     // No auto-check on startup anymore — purely opt-in via the "Check for
@@ -154,15 +156,22 @@ pub fn App() -> Element {
         if let Some(tree) = maybe_tree {
             let svg_content = generate_svg(&tree, spacing_s, merges, &direction, &style);
             spawn(async move {
-                let file = rfd::AsyncFileDialog::new()
-                    .set_title("Export tree as SVG")
-                    .add_filter("SVG image", &["svg"])
-                    .set_file_name("git-tree-export.svg")
-                    .save_file()
-                    .await;
-                if let Some(handle) = file {
-                    let _ = handle.write(svg_content.as_bytes()).await;
+                let saved = crate::platform::save_file(
+                    "Export tree as SVG",
+                    "SVG image",
+                    "svg",
+                    "git-tree-export.svg",
+                    svg_content.into_bytes(),
+                )
+                .await;
+                // No dialog on Android, so tell the user where the file went.
+                #[cfg(target_os = "android")]
+                if let Some(path) = saved {
+                    let msg = format!("Saved to {}", path.display());
+                    let _ = dioxus::document::eval(&format!("alert({msg:?})"));
                 }
+                #[cfg(not(target_os = "android"))]
+                let _ = saved;
             });
         }
     };
@@ -229,6 +238,7 @@ pub fn App() -> Element {
     rsx! {
         style { "{BASE_CSS}" }
         style { "{MODERN_CSS}" }
+        style { "{MOBILE_CSS}" }
         style { "{theme_css}" }
 
         div {
@@ -328,7 +338,14 @@ pub fn App() -> Element {
                                 LeftPanel {
                                     commit:     selected_commit.read().clone(),
                                     open:       *left_open.read(),
-                                    on_toggle:  move |_| left_open.set(!left_open()),
+                                    on_toggle:  move |_| {
+                                        let open = !left_open();
+                                        left_open.set(open);
+                                        // One panel at a time on a phone.
+                                        if open && cfg!(target_os = "android") {
+                                            right_open.set(false);
+                                        }
+                                    },
                                     remote_url: repo_tree.read().as_ref()
                                         .and_then(|r| r.remote_url.clone()),
                                 }
@@ -401,7 +418,13 @@ pub fn App() -> Element {
                                 RightPanel {
                                     commit:       selected_commit.read().clone(),
                                     open:         *right_open.read(),
-                                    on_toggle:    move |_| right_open.set(!right_open()),
+                                    on_toggle:    move |_| {
+                                        let open = !right_open();
+                                        right_open.set(open);
+                                        if open && cfg!(target_os = "android") {
+                                            left_open.set(false);
+                                        }
+                                    },
                                     diff_loading: *diff_loading.read(),
                                     on_view_diff: move |commit: CommitNode| {
                                         screen.set(Screen::Diff(Box::new(commit)))

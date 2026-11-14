@@ -256,6 +256,52 @@ dx build --platform desktop --release
 # Binary will be at: dist/git-tree
 ```
 
+### 📱 Android APK (experimental)
+
+The Android build uses the `mobile` Cargo feature instead of `desktop`.
+On Android there is no folder picker, so you **clone** repos (into app storage)
+instead of opening local folders. SVG exports are saved to `Download/`.
+
+```bash
+# One-time: Rust Android targets, JDK 17 check, Android SDK + NDK (~3 GB)
+./scripts/android-setup.sh
+
+# Build the APK
+./scripts/android-setup.sh build
+
+# Install on a phone with USB debugging enabled
+adb install -r dist/git-tree-0.3.6-arm64.apk
+```
+
+Or run it on a connected phone / emulator with hot reload:
+
+```bash
+dx serve --platform android --no-default-features --features mobile
+```
+
+**CI:** `build-android.yml` builds the APK on every push, and
+`deploy-android.yml` attaches it to the GitHub release on `v*` tags.
+
+**Release signing (optional):** without configuration the APK is signed
+with a throw-away debug key, so phones refuse to update one release over
+another (uninstall first). To sign with a stable key, create a keystore
+once and add it as repository secrets:
+
+```bash
+keytool -genkeypair -v -keystore git-tree-release.jks -alias git-tree \
+  -keyalg RSA -keysize 4096 -validity 10000
+```
+
+| Secret                     | Value                                   |
+|----------------------------|-----------------------------------------|
+| `ANDROID_KEYSTORE_BASE64`  | `base64 -w0 git-tree-release.jks`       |
+| `ANDROID_KEYSTORE_PASSWORD`| keystore password                       |
+| `ANDROID_KEY_ALIAS`        | `git-tree` (or the alias you chose)     |
+| `ANDROID_KEY_PASSWORD`     | key password                            |
+
+Keep the `.jks` file safe: losing it means future releases can't update
+installed copies.
+
 ---
 
 ## Usage
@@ -370,6 +416,7 @@ dx build --platform desktop --release
 - [x] GitHub OAuth login (private repo access)
 - [x] Windows installer (MSI via cargo-wix)
 - [x] macOS build
+- [ ] Android APK (experimental — clone & view repos on a phone)
 
 ---
 
@@ -384,7 +431,8 @@ dx build --platform desktop --release
 
 ```
 src/
-├── main.rs                 # Entry point, window config
+├── main.rs                 # Entry point, window config (desktop / mobile launch)
+├── platform.rs             # Desktop vs Android shims (dialogs, storage paths)
 ├── app.rs                  # Root component + global state
 ├── theme.rs                # 15 themes + contributor color engine
 ├── recent.rs               # Recent repos persistence (~/.config/git-tree/)
@@ -409,6 +457,7 @@ src/
 assets/
 ├── css/
 │   ├── style.css           # Core terminal theme + layout
+│   ├── mobile.css          # Narrow-screen / phone overrides
 │   ├── diff_viewer.css     # Diff viewer styles
 │   ├── left_panel.css      # Left panel styles
 │   ├── right_panel.css     # Right panel styles

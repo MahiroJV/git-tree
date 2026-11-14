@@ -1,0 +1,56 @@
+/* mobile.css — Narrow-screen overrides (Android phones, small windows).
+   Desktop windows have a 900px minimum width, so none of this applies there. */
+
+@media (max-width: 700px) {
+    .app-root {
+        /* An open side panel takes most of the screen; the app closes the
+           other panel when one opens (see on_toggle in app.rs). */
+        --panel-width: min(270px, 78vw);
+        --toolbar-height: 52px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Toolbar: brand + buttons on one row, search below ── */
+    .toolbar {
+        grid-template-columns: auto 1fr;
+        grid-template-areas:
+            "left right"
+            "center center";
+        height: auto;
+        padding: 6px 10px;
+        row-gap: 6px;
+    }
+    .toolbar-left   { grid-area: left; }
+    .toolbar-right  { grid-area: right; flex-wrap: wrap; gap: 6px; }
+    .toolbar-center { grid-area: center; justify-content: stretch; }
+    .toolbar-center input { width: 100%; }
+
+    /* Finger-sized tap targets */
+    button,
+    .toolbar-btn {
+        min-height: 36px;
+        min-width: 36px;
+    }
+
+    /* ── Home screen ── */
+    .home-screen {
+        padding: 20px 14px;
+        gap: 18px;
+    }
+    .ascii-header {
+        font-size: 34px;
+        letter-spacing: 0.15em;
+    }
+    .input-group {
+        flex-wrap: wrap;
+    }
+    .input-group .terminal-input {
+        flex: 1 1 100%;
+        min-width: 0;
+        /* 16px stops Android/iOS from zooming the page on focus */
+        font-size: 16px;
+    }
+    .input-group .btn-primary {
+        flex: 1 1 auto;
+    }
+}

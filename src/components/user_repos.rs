@@ -117,7 +117,7 @@ pub fn UserRepos(token: String, on_load: EventHandler<RepoTree>) -> Element {
     //             }
     //             Ok(Err(e)) => {
     //                 cloning_url.set(None);
-    //                 clone_error.set(Some(format!("Clone failed: {e}")));
+    //                 clone_error.set(Some(format!("Clone failed: {e:#}")));
     //             }
     //             Err(_) => {
     //                 cloning_url.set(None);
@@ -433,7 +433,7 @@ pub fn UserRepos(token: String, on_load: EventHandler<RepoTree>) -> Element {
                                                                 {
                                                                     format!("Clone of {display_name} cancelled.")
                                                                 } else {
-                                                                    format!("Clone failed: {e}")
+                                                                    format!("Clone failed: {e:#}")
                                                                 };
                                                                 clone_error.set(Some(msg));
                                                             }

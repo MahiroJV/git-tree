@@ -145,6 +145,16 @@ pub fn TreeCanvas(
     let mut drag_sx = use_signal(|| 0.0_f64);
     let mut drag_sy = use_signal(|| 0.0_f64);
     let mut show_minimap = use_signal(|| true);
+    // The `.tree-viewport` element, so zooming can be anchored to the view
+    // (its centre for buttons/keys, the pointer for wheel/pinch) instead of
+    // the SVG's top-left corner.
+    let mut viewport = use_signal(|| None::<std::rc::Rc<MountedData>>);
+    // Touch panning/pinching is translated into mouse/wheel events by a
+    // small JS shim: Dioxus 0.6 can't deserialize Android touch or pointer
+    // events, but the mouse handlers below work fine.
+    use_effect(|| {
+        let _ = dioxus::document::eval(TOUCH_SHIM_JS);
+    });
 
     let Some(tree) = tree else {
         return rsx! { div { class: "canvas-empty", "> NO REPOSITORY LOADED" } };
@@ -325,11 +335,9 @@ pub fn TreeCanvas(
             } else if e.key() == Key::Escape {
                 on_deselect.call(());
             } else if is_char("+") || is_char("=") {
-                let s = (*scale.read() + 0.1).min(3.0);
-                scale.set(s);
+                zoom_around(viewport, scale, offset_x, offset_y, 0.1, None);
             } else if is_char("-") || is_char("_") {
-                let s = (*scale.read() - 0.1).max(0.2);
-                scale.set(s);
+                zoom_around(viewport, scale, offset_x, offset_y, -0.1, None);
             } else if is_char("0") {
                 scale.set(1.0);
                 offset_x.set(0.0);
@@ -386,12 +394,12 @@ pub fn TreeCanvas(
                         z-index: 10; display: flex; gap: 6px;",
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| { let s = (*scale.read() + 0.1).min(3.0); scale.set(s); },
+                    onclick: move |_| zoom_around(viewport, scale, offset_x, offset_y, 0.1, None),
                     "[ + ]"
                 }
                 button {
                     class: "toolbar-btn",
-                    onclick: move |_| { let s = (*scale.read() - 0.1).max(0.2); scale.set(s); },
+                    onclick: move |_| zoom_around(viewport, scale, offset_x, offset_y, -0.1, None),
                     "[ - ]"
                 }
                 button {
@@ -518,18 +526,20 @@ pub fn TreeCanvas(
 
             // ── Main canvas ────────────────────────────────────────────────
             div {
-                style: "width: 100%; height: 100%; overflow: hidden;",
+                class: "tree-viewport",
+                // touch-action: none — the webview must not scroll/zoom the
+                // page itself; the touch shim pans and zooms the tree instead.
+                style: "width: 100%; height: 100%; overflow: hidden; touch-action: none;",
+                onmounted: move |e| viewport.set(Some(e.data())),
 
                 onwheel: move |e| {
                     let delta_y = e.delta().strip_units().y;
                     let delta_x = e.delta().strip_units().x;
                     if e.modifiers().ctrl() {
-                        let s = if delta_y < 0.0 {
-                            (*scale.read() + 0.08).min(3.0)
-                        } else {
-                            (*scale.read() - 0.08).max(0.2)
-                        };
-                        scale.set(s);
+                        // Zoom around the cursor (or pinch midpoint, see shim).
+                        let p = e.client_coordinates();
+                        let step = if delta_y < 0.0 { 0.08 } else { -0.08 };
+                        zoom_around(viewport, scale, offset_x, offset_y, step, Some((p.x, p.y)));
                     } else {
                         let new_x = *offset_x.read() - delta_x;
                         let new_y = *offset_y.read() - delta_y;
@@ -537,19 +547,25 @@ pub fn TreeCanvas(
                         offset_y.set(new_y);
                     }
                 },
+                // The SVG is `scale(s) translate(o)`, so a pointer move of d px
+                // is an offset change of d / s — otherwise dragging while
+                // zoomed moves the tree faster or slower than the pointer.
                 onmousedown: move |e| {
                     is_dragging.set(true);
-                    drag_sx.set(e.client_coordinates().x - *offset_x.read());
-                    drag_sy.set(e.client_coordinates().y - *offset_y.read());
+                    let s = *scale.read();
+                    drag_sx.set(e.client_coordinates().x - *offset_x.read() * s);
+                    drag_sy.set(e.client_coordinates().y - *offset_y.read() * s);
                 },
                 onmousemove: move |e| {
                     if *is_dragging.read() {
-                        offset_x.set(e.client_coordinates().x - *drag_sx.read());
-                        offset_y.set(e.client_coordinates().y - *drag_sy.read());
+                        let s = *scale.read();
+                        offset_x.set((e.client_coordinates().x - *drag_sx.read()) / s);
+                        offset_y.set((e.client_coordinates().y - *drag_sy.read()) / s);
                     }
                 },
                 onmouseup:    move |_| is_dragging.set(false),
                 onmouseleave: move |_| is_dragging.set(false),
+
 
                 svg {
                     width:  "{canvas_width}",
@@ -814,4 +830,114 @@ fn CommitDot(
             }
         }
     }
+}
+
+/// Maps touch gestures on `.tree-viewport` to the mouse/wheel events the
+/// canvas already handles: one finger drags → mousedown/mousemove/mouseup
+/// (pan); two fingers → ctrl+wheel (zoom, same path as trackpad pinch).
+/// Taps are left alone so the browser still produces `click` for nodes.
+const TOUCH_SHIM_JS: &str = r#"
+(() => {
+  if (window.__gitTreeTouchShim) return;
+  window.__gitTreeTouchShim = true;
+
+  const SEL = '.tree-viewport';
+  let target = null;      // element the gesture started on
+  let pinchDist = null;   // finger distance at the last zoom step
+
+  const mouse = (type, t) => target && target.dispatchEvent(new MouseEvent(type, {
+    bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1,
+    clientX: t.clientX, clientY: t.clientY, screenX: t.screenX, screenY: t.screenY,
+  }));
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+  document.addEventListener('touchstart', (e) => {
+    const el = e.target.closest && e.target.closest(SEL);
+    if (!el) { target = null; return; }
+    target = e.target;
+    if (e.touches.length === 1) {
+      mouse('mousedown', e.touches[0]);
+    } else {
+      // Second finger: stop the pan and start measuring the pinch.
+      mouse('mouseup', e.touches[0]);
+      pinchDist = dist(e.touches[0], e.touches[1]);
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!target) return;
+    e.preventDefault();
+    if (e.touches.length >= 2) {
+      const d = dist(e.touches[0], e.touches[1]);
+      if (pinchDist === null) { pinchDist = d; return; }
+      const delta = d - pinchDist;
+      if (Math.abs(delta) >= 12) {   // one zoom step per ~12px of spread
+        pinchDist = d;
+        target.dispatchEvent(new WheelEvent('wheel', {
+          bubbles: true, cancelable: true, ctrlKey: true, deltaY: -delta,
+          clientX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          clientY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        }));
+      }
+    } else {
+      mouse('mousemove', e.touches[0]);
+    }
+  }, { passive: false });
+
+  const end = (e) => {
+    if (!target) return;
+    if (e.touches.length === 0) {
+      mouse('mouseup', e.changedTouches[0]);
+      target = null;
+      pinchDist = null;
+    } else if (e.touches.length === 1) {
+      // Pinch ended with one finger still down: continue as a pan.
+      pinchDist = null;
+      mouse('mousedown', e.touches[0]);
+    }
+  };
+  document.addEventListener('touchend', end, { passive: true });
+  document.addEventListener('touchcancel', end, { passive: true });
+})();
+"#;
+
+/// Change the zoom by `step`, keeping the content under `anchor_client`
+/// (viewport-relative after subtracting the viewport's position) fixed on
+/// screen. `None` anchors at the centre of the viewport.
+///
+/// The SVG transform is `scale(s) translate(o)`, i.e. screen = s·(content + o).
+/// Holding screen point p over the same content point across s → s' gives
+/// o' = o + p·(1/s' − 1/s).
+fn zoom_around(
+    viewport: Signal<Option<std::rc::Rc<MountedData>>>,
+    mut scale: Signal<f64>,
+    mut offset_x: Signal<f64>,
+    mut offset_y: Signal<f64>,
+    step: f64,
+    anchor_client: Option<(f64, f64)>,
+) {
+    let old = *scale.read();
+    let new = (old + step).clamp(0.2, 3.0);
+    if (new - old).abs() < f64::EPSILON {
+        return;
+    }
+    let el = viewport.read().clone();
+    spawn(async move {
+        let rect = match el {
+            Some(el) => el.get_client_rect().await.ok(),
+            None => None,
+        };
+        let (px, py) = match (rect, anchor_client) {
+            (Some(r), Some((cx, cy))) => (cx - r.origin.x, cy - r.origin.y),
+            (Some(r), None) => (r.size.width / 2.0, r.size.height / 2.0),
+            // No layout info yet: fall back to the old top-left behaviour.
+            (None, _) => (0.0, 0.0),
+        };
+        let k = 1.0 / new - 1.0 / old;
+        let ox = *offset_x.read() + px * k;
+        let oy = *offset_y.read() + py * k;
+        offset_x.set(ox);
+        offset_y.set(oy);
+        scale.set(new);
+    });
 }
