@@ -102,7 +102,23 @@ jobs:
         run: cargo clippy --no-default-features --features mobile -- -D warnings
 
       - name: Build APK
+        id: apk
         run: ./scripts/android-setup.sh build
+
+      # `dx bundle` swallows compiler/build-script output and only prints
+      # "Cargo build failed". On failure, rerun the Rust part with plain cargo
+      # and the same NDK settings dx uses, so the real error is in the log.
+      - name: Show real build error (only if APK build failed)
+        if: failure() && steps.apk.outcome == 'failure'
+        run: |
+          TC="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export ANDROID_NATIVE_API_LEVEL=24
+          export ANDROID_NDK_ROOT="$NDK_HOME"
+          export TARGET_CC="$TC/clang" TARGET_CXX="$TC/clang++" TARGET_AR="$TC/llvm-ar"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TC/aarch64-linux-android24-clang"
+          cargo build --release --target aarch64-linux-android \
+            --no-default-features --features mobile -vv 2>&1 | tail -n 150
+          exit 1
 
       - name: Set artifact metadata
         id: meta
