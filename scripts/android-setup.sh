@@ -77,6 +77,14 @@ build() {
     export JAVA_HOME="${JAVA_HOME:-$(find_jdk17)}"
     [ -d "$ANDROID_NDK_HOME" ] || { echo "NDK missing — run ./scripts/android-setup.sh first"; exit 1; }
 
+    # dx sets TARGET_CC/CXX/AR but not RANLIB, so the vendored OpenSSL build
+    # falls back to `aarch64-linux-android-ranlib`, which the NDK no longer
+    # ships ("ranlib: not found" in `make install_dev`). Point it at llvm-ranlib.
+    local ndk_bin
+    ndk_bin="$(echo "$ANDROID_NDK_HOME"/toolchains/llvm/prebuilt/*/bin)"
+    export TARGET_RANLIB="$ndk_bin/llvm-ranlib"
+    export RANLIB_aarch64_linux_android="$TARGET_RANLIB"
+
     echo "== Building APK (arm64) =="
     dx bundle --platform android --release \
         --target aarch64-linux-android \

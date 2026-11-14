@@ -114,7 +114,7 @@ jobs:
           TC="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export ANDROID_NATIVE_API_LEVEL=24
           export ANDROID_NDK_ROOT="$NDK_HOME"
-          export TARGET_CC="$TC/clang" TARGET_CXX="$TC/clang++" TARGET_AR="$TC/llvm-ar"
+          export TARGET_CC="$TC/clang" TARGET_CXX="$TC/clang++" TARGET_AR="$TC/llvm-ar" TARGET_RANLIB="$TC/llvm-ranlib"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TC/aarch64-linux-android24-clang"
           cargo build --release --target aarch64-linux-android \
             --no-default-features --features mobile -vv 2>&1 | tail -n 150
