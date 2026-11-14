@@ -42,6 +42,20 @@ jobs:
           components: rustfmt, clippy
           targets: aarch64-linux-android
 
+      - name: Install Linux dependencies for host Clippy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev
+          
       # Gradle (as driven by dx 0.6) needs JDK 17
       - name: Install JDK 17
         uses: actions/setup-java@v4
@@ -49,6 +63,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Install system depencies
+        run: |
+          sudo apt-get update  
+      
       - name: Install Android SDK + NDK
         uses: android-actions/setup-android@v3
         with:
@@ -99,3 +117,4 @@ jobs:
           path: dist/*.apk
           retention-days: 7
           if-no-files-found: error
+      
