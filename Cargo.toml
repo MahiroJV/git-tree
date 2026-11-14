@@ -10,7 +10,7 @@ repository = "https://github.com/MahiroJV/git-tree"
 keywords = ["git", "visualizer", "terminal", "dioxus", "tui"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
-exclude = ["assets/fonts/*.ttf", ".idea/"]
+exclude = ["assets/fonts/*.ttf", ".idea/", "vendor/"]
 
 [dependencies]
 dioxus = { version = "0.6" }
@@ -25,17 +25,22 @@ dirs = "5"
 sha2 = "0.10"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
-image = "0.25.10"
-web-sys = { version = "0.3.97", features = ["Navigator"] }
+# Window icon decoding — desktop only.
+image = { version = "0.25.10", optional = true }
 reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
 urlencoding = "2"
 openssl = { version = "0.10", features = ["vendored"] }
 webbrowser = "0.8"
 
+# ashpd 0.8.1 (via dioxus-desktop → rfd 0.14) fails on Rust ≥ 1.100; see
+# vendor/README.md. Drop this when moving to Dioxus 0.7+.
+[patch.crates-io]
+ashpd = { path = "vendor/ashpd" }
+
 [features]
 default = ["desktop"]
 # Linux / Windows / macOS app (webview window + native file dialogs).
-desktop = ["dioxus/desktop", "dep:rfd"]
+desktop = ["dioxus/desktop", "dep:rfd", "dep:image"]
 # Android (and later iOS): `dx bundle --platform android`.
 mobile = ["dioxus/mobile"]
 
